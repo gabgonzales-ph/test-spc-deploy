@@ -421,7 +421,7 @@ export default function SanPabloCityInfoPage() {
       </ScrollRevealSection>
 
             {/* City Offices Map */}
-        {/* <ScrollRevealSection className="py-12 md:py-16 px-4">
+        <ScrollRevealSection className="py-12 md:py-16 px-4">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-10">
               <div className="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 bg-emerald-100 rounded-2xl mb-6">
@@ -434,7 +434,7 @@ export default function SanPabloCityInfoPage() {
             </div>
             <CityOfficesMap />
           </div>
-        </ScrollRevealSection> */}
+        </ScrollRevealSection>
 
 
 <ScrollRevealSection className="py-12 md:py-16 px-4 bg-white/70">

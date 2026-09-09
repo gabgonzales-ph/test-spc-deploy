@@ -205,16 +205,17 @@ export function RedressMechanismPanel({ onClose }: { onClose: () => void }) {
 
       {/* Footer CTA */}
       <a
-        href="https://www.sanpablocity.gov.ph/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-1.5 px-4 py-3 border-t border-gray-100 bg-gray-50/60 text-[15px] font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
-      >
-        View more about San Pablo City
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="size-3.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-        </svg>
-      </a>
+
+  href="https://www.sanpablocity.gov.ph/"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-3 md:py-3.5 border-t border-gray-100 bg-gray-50/60 text-[13px] sm:text-[14px] md:text-[15px] font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
+>
+  View more about San Pablo City
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="size-3 sm:size-3.5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+  </svg>
+</a>
     </div>
   );
 }
