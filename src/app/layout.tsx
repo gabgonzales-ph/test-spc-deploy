@@ -29,18 +29,21 @@ export const metadata: Metadata = {
   description: "Official website of the City Government of San Pablo, Laguna, Philippines.",
 };
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Primary Supabase project */}
-        <link rel="preconnect" href="https://hvalkmxibjgrwipfuvhw.supabase.co" />
-        <link rel="dns-prefetch" href="https://hvalkmxibjgrwipfuvhw.supabase.co" />
-        {/* Banner/media Supabase project */}
-        <link rel="preconnect" href="https://yljsclzmrxuhejgcesiv.supabase.co" />
-        <link rel="dns-prefetch" href="https://yljsclzmrxuhejgcesiv.supabase.co" />
+        {/* Supabase project — follows whichever project is set in env vars */}
+        {SUPABASE_URL && (
+          <>
+            <link rel="preconnect" href={SUPABASE_URL} />
+            <link rel="dns-prefetch" href={SUPABASE_URL} />
+          </>
+        )}
         <AnimationCSS />
       </head>
 

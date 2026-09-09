@@ -4,7 +4,7 @@ import { Elysia, t } from "elysia";
 import { supabase } from "@/backend/config/database";
 import { successResponse } from "@/backend/utils/response";
 import { errorHandler, throwNotFoundError } from "@/backend/utils/error";
-import { formatPaginationResponse } from "@/backend/utils/helpers";
+import { formatPaginationResponse, getPublicMediaUrl } from "@/backend/utils/helpers";
 
 type ArticleStatus = "draft" | "review" | "published" | "archived";
 
@@ -96,8 +96,27 @@ export const articleRoutes = new Elysia({ prefix: "/articles" })
       throw new Error("Failed to fetch articles");
     }
 
+    // Rewrite featured_media.file_path into a full public URL against the
+    // currently configured Supabase project, so the frontend never has to
+    // know which project is active or handle relative paths itself.
+const transformedData = (data || []).map((article) => {
+  const media = Array.isArray(article.featured_media)
+    ? article.featured_media[0]
+    : article.featured_media;
+
+  return {
+    ...article,
+    featured_media: media
+      ? {
+          ...media,
+          file_path: getPublicMediaUrl(media.file_path),
+        }
+      : null,
+  };
+});
+
     return formatPaginationResponse({
-      data: (data || []) as unknown[],
+      data: transformedData as unknown[],
       page,
       limit,
       total: count || 0,
@@ -222,7 +241,25 @@ export const articleRoutes = new Elysia({ prefix: "/articles" })
       console.log(">>> RAW QUERY ERROR:", rawError);
 
       console.log("Article found:", data.title);
-      return successResponse(data);
+
+      // Same URL rewrite as above, applied to the single-article shape.
+const media = Array.isArray(data.featured_media)
+  ? data.featured_media[0]
+  : data.featured_media;
+
+const transformedData = {
+  ...data,
+  featured_media: media
+    ? {
+        ...media,
+        file_path: getPublicMediaUrl(media.file_path),
+      }
+    : null,
+};
+
+return successResponse(transformedData);
+
+      return successResponse(transformedData);
     },
     {
       params: t.Object({

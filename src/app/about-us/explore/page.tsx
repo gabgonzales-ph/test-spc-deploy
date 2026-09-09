@@ -50,8 +50,6 @@ const sectionReveal: Variants = {
   },
 };
 
-
-
 const ScrollRevealSection = ({
   children,
   className,
@@ -80,12 +78,27 @@ const cityStats: Stat[] = [
 
 // ---------------------------------------------------------------------------
 // SevenLakesCarousel — auto-scrolling with pause on hover/interaction
+// Image URLs are now built from NEXT_PUBLIC_SUPABASE_URL instead of being
+// hardcoded to a specific Supabase project, so they follow whichever
+// project is currently configured in env vars.
 // ---------------------------------------------------------------------------
 
 interface Lake {
   name: string;
   description: string;
-  image: string;
+  image: string; // filename only, e.g. "lakebunot_rev02-ssdiaries.jpg"
+}
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const LAKES_BUCKET_PATH = "storage/v1/object/public/media/lakes";
+
+function getLakeImageUrl(filename: string) {
+  if (!SUPABASE_URL) {
+    // Fails loud in dev/build rather than silently rendering broken images
+    console.error("NEXT_PUBLIC_SUPABASE_URL is not set — lake images will not load");
+    return "";
+  }
+  return `${SUPABASE_URL}/${LAKES_BUCKET_PATH}/${filename}`;
 }
 
 const SCROLL_INTERVAL = 2000;
@@ -97,46 +110,41 @@ const SevenLakesCarousel = () => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const lakes: Lake[] = [
-        {
+    {
       name: "Bunot Lake",
       description: "The smallest but most charming lake, surrounded by verdant landscapes.",
-      image: "https://hvalkmxibjgrwipfuvhw.supabase.co/storage/v1/object/public/assets/seven-lakes/lakebunot_rev02-ssdiaries.jpg",
+      image: "lakebunot_rev02-ssdiaries.jpg",
     },
     {
       name: "Yambo Lake",
       description: "A picturesque lake offering stunning views and fishing opportunities.",
-      image: "https://hvalkmxibjgrwipfuvhw.supabase.co/storage/v1/object/public/assets/seven-lakes/lake_yambo20mod-crop-ssdiaries.jpg",
+      image: "lake_yambo20mod-crop-ssdiaries.jpg",
     },
-        {
+    {
       name: "Pandin Lake",
       description: "Famous for its bamboo raft rides and pristine natural beauty.",
-      image: "https://hvalkmxibjgrwipfuvhw.supabase.co/storage/v1/object/public/assets/seven-lakes/lakepandin-rev02-ssdiaries.jpg",
+      image: "lakepandin-rev02-ssdiaries.jpg",
     },
-        {
+    {
       name: "Mohicap Lake",
       description: "Known for its crystal-clear waters and tranquil atmosphere.",
-      image: "https://hvalkmxibjgrwipfuvhw.supabase.co/storage/v1/object/public/assets/seven-lakes/lake_mohicap14-ssd.jpg",
+      image: "lake_mohicap14-ssd.jpg",
     },
-        {
+    {
       name: "Calibato Lake",
       description: "A hidden gem with calm waters perfect for kayaking and nature walks.",
-      image: "https://hvalkmxibjgrwipfuvhw.supabase.co/storage/v1/object/public/assets/seven-lakes/lake_calibato01mod-ssdiaries.jpg",
+      image: "lake_calibato01mod-ssdiaries.jpg",
     },
     {
       name: "Palakpakin Lake",
       description: "A serene lake surrounded by lush vegetation, ideal for peaceful retreats.",
-      image: "https://hvalkmxibjgrwipfuvhw.supabase.co/storage/v1/object/public/assets/seven-lakes/lake_palakpakin01ss_diaries.jpg",
+      image: "lake_palakpakin01ss_diaries.jpg",
     },
-
-
-
-
-        {
+    {
       name: "Sampaloc Lake",
       description: "The largest and most popular of the seven lakes, perfect for water activities and scenic views.",
-      image: "https://hvalkmxibjgrwipfuvhw.supabase.co/storage/v1/object/public/assets/seven-lakes/lakesampaloc00-ssdiaries.jpg",
+      image: "lakesampaloc00-ssdiaries.jpg",
     },
-
   ];
 
   const startAutoScroll = useCallback(() => {
@@ -209,7 +217,7 @@ const SevenLakesCarousel = () => {
                 >
                   <div className="relative w-full h-64 overflow-hidden rounded-xl">
                     <Image
-                      src={lake.image}
+                      src={getLakeImageUrl(lake.image)}
                       alt={lake.name}
                       fill
                       className="object-cover"
@@ -264,7 +272,7 @@ const SevenLakesCarousel = () => {
                   }}
                 >
                   <Image
-                    src={selectedLake.image}
+                    src={getLakeImageUrl(selectedLake.image)}
                     alt={selectedLake.name}
                     fill
                     className="object-cover"

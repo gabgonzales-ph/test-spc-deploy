@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import { supabase } from "@/backend/config/database";
+import { getPublicMediaUrl } from "@/backend/utils/helpers";
 import HomeCarousel from "@/components/home/HomeCarousel";
 import MergedInfoCard from "@/components/home/MergeInfoCard";
 import HomeBelowFold from "@/components/client/HomeBelowFold";
@@ -52,7 +53,24 @@ const getLatestArticles = unstable_cache(
       console.error("Failed to fetch articles for homepage:", error);
       return [];
     }
-    return (data as unknown as Article[]) || [];
+
+    const rawArticles = (data as unknown as Article[]) || [];
+
+    // Normalize featured_media (Supabase may return this as an array or a
+    // single object depending on join inference) and rewrite file_path into
+    // a full URL against the currently configured Supabase project.
+    return rawArticles.map((article) => {
+      const media = Array.isArray(article.featured_media)
+        ? article.featured_media[0]
+        : article.featured_media;
+
+      return {
+        ...article,
+        featured_media: media
+          ? { ...media, file_path: getPublicMediaUrl(media.file_path) ?? "" }
+          : null,
+      };
+    });
   },
   ["homepage-articles"],
   { revalidate: 300, tags: ["homepage-articles"] }
@@ -81,7 +99,19 @@ const getLatestBanners = unstable_cache(
       console.error("Failed to fetch banners for homepage:", error);
       return [];
     }
-    return (data as unknown as Banner[]) || [];
+
+    const rawBanners = (data as unknown as Banner[]) || [];
+
+    return rawBanners.map((banner) => {
+      const media = Array.isArray(banner.media) ? banner.media[0] : banner.media;
+
+      return {
+        ...banner,
+        media: media
+          ? { ...media, file_path: getPublicMediaUrl(media.file_path) ?? "" }
+          : undefined,
+      };
+    });
   },
   ["homepage-banners"],
   { revalidate: 60, tags: ["homepage-banners"] }

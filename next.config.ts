@@ -24,11 +24,11 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com",
       "style-src 'self' 'unsafe-inline' https://www.gstatic.com",
-      "img-src 'self' data: blob: https://hvalkmxibjgrwipfuvhw.supabase.co https://yljsclzmrxuhejgcesiv.supabase.co https://kfzpspgisjwnkncmvvjp.supabase.co https://www.sanpablocity.gov.ph https://sanpablocity.gov.ph https://webapi.sanpablocitygov.org https://placehold.co https://*.tile.openstreetmap.org",
+      "img-src 'self' data: blob: https://xpyfthmcffrsehkljgtv.supabase.co https://www.sanpablocity.gov.ph https://sanpablocity.gov.ph https://webapi.sanpablocitygov.org https://placehold.co https://*.tile.openstreetmap.org",
       "font-src 'self'",
       // wss:// required for Supabase Realtime WebSocket connections
-      `connect-src 'self'  https://www.google.com https://www.gstatic.com https://hvalkmxibjgrwipfuvhw.supabase.co wss://hvalkmxibjgrwipfuvhw.supabase.co https://yljsclzmrxuhejgcesiv.supabase.co wss://yljsclzmrxuhejgcesiv.supabase.co https://kfzpspgisjwnkncmvvjp.supabase.co wss://kfzpspgisjwnkncmvvjp.supabase.co${isProd ? "" : " http://localhost:3001"}`,
-      "frame-src 'self' https://yljsclzmrxuhejgcesiv.supabase.co https://kfzpspgisjwnkncmvvjp.supabase.co http://oras.pagasa.dost.gov.ph https://www.google.com",
+      `connect-src 'self'  https://www.google.com https://www.gstatic.com https://xpyfthmcffrsehkljgtv.supabase.co wss://xpyfthmcffrsehkljgtv.supabase.co${isProd ? "" : " http://localhost:3001"}`,
+      "frame-src 'self' https://xpyfthmcffrsehkljgtv.supabase.co http://oras.pagasa.dost.gov.ph https://www.google.com",
       "frame-ancestors 'self'",
     ].join("; "),
   },
@@ -62,32 +62,12 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "hvalkmxibjgrwipfuvhw.supabase.co",
+        hostname: "xpyfthmcffrsehkljgtv.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
       {
         protocol: "https",
-        hostname: "hvalkmxibjgrwipfuvhw.supabase.co",
-        pathname: "/storage/v1/object/sign/**",
-      },
-      {
-        protocol: "https",
-        hostname: "yljsclzmrxuhejgcesiv.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
-      {
-        protocol: "https",
-        hostname: "yljsclzmrxuhejgcesiv.supabase.co",
-        pathname: "/storage/v1/object/sign/**",
-      },
-      {
-        protocol: "https",
-        hostname: "kfzpspgisjwnkncmvvjp.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
-      {
-        protocol: "https",
-        hostname: "kfzpspgisjwnkncmvvjp.supabase.co",
+        hostname: "xpyfthmcffrsehkljgtv.supabase.co",
         pathname: "/storage/v1/object/sign/**",
       },
       {
