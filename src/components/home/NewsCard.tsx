@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
@@ -31,19 +30,16 @@ export default function NewsCard({
   return (
     <article className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group hover:scale-105 h-full flex flex-col">
       <div className="relative overflow-hidden">
-        {/* Optimized: Updated to a subtle emerald background and removed the blurred Image component */}
         <div className="relative w-full h-52 bg-emerald-900/5 flex items-center justify-center overflow-hidden">
-          
-          {/* Main image */}
-<Image
-  src={imgSrc}
-  alt={title || "News Image"}
-  fill
-  
-  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-  className="object-contain p-2 z-10 transition-transform duration-300 group-hover:scale-110"
-  onError={() => setImgSrc("https://placehold.co/500x300?text=No+Image")}
-/>
+
+          {/* Main image — plain <img>, bypasses Vercel Image Optimization */}
+          <img
+            src={imgSrc}
+            alt={title || "News Image"}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-contain p-2 z-10 transition-transform duration-300 group-hover:scale-110"
+            onError={() => setImgSrc("https://placehold.co/500x300?text=No+Image")}
+          />
         </div>
         <div className="absolute top-2 left-2 z-20">
           <span className="inline-block bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg">

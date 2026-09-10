@@ -4,13 +4,14 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ImageOff, X } from "lucide-react";
-import Image from "next/image";
 import { motion, type Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useAboutUs } from "@/hooks/useAboutUs";
 
 // ---------------------------------------------------------------------------
 // ImageGallery — CMS-driven, fetches from the "about-us" Supabase folder
+// Uses plain <img> tags (not next/image) to avoid Vercel Image Optimization
+// quota/billing — see NewsCard.tsx for the same change and rationale.
 // ---------------------------------------------------------------------------
 
 const imageFrameHoverClass =
@@ -226,7 +227,12 @@ export const ImageGallery = () => {
               className={`relative group cursor-pointer overflow-hidden aspect-[16/9] w-full ${widthClasses[index]} md:flex-shrink-0 ${imageFrameHoverClass}`}
               onClick={() => setSelectedIndex(index)}
             >
-              <Image src={photo.url} alt={photo.caption ?? `San Pablo City photo ${index + 1}`} fill className="object-cover" sizes="(max-width: 767px) 100vw, 50vw" />
+              <img
+                src={photo.url}
+                alt={photo.caption ?? `San Pablo City photo ${index + 1}`}
+                loading="lazy"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
               {photo.caption && (
                 <div
                   className={`absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none transition-all duration-500 ease-out md:opacity-0 md:translate-y-0 md:group-hover:opacity-100 ${
@@ -260,7 +266,12 @@ export const ImageGallery = () => {
               className={`relative group cursor-pointer overflow-hidden aspect-[16/9] w-full ${widthClasses[index - 3]} md:flex-shrink-0 ${imageFrameHoverClass}`}
               onClick={() => setSelectedIndex(index)}
             >
-              <Image src={photo.url} alt={photo.caption ?? `San Pablo City photo ${index + 1}`} fill className="object-cover" sizes="(max-width: 767px) 100vw, 50vw" />
+              <img
+                src={photo.url}
+                alt={photo.caption ?? `San Pablo City photo ${index + 1}`}
+                loading="lazy"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
               {photo.caption && (
                 <div
                   className={`absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none transition-all duration-500 ease-out md:opacity-0 md:translate-y-0 md:group-hover:opacity-100 ${
@@ -303,12 +314,10 @@ export const ImageGallery = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative min-h-0 flex-1 md:flex-none">
-              <Image
+              <img
                 src={selectedPhoto.url}
                 alt={selectedPhoto.caption ?? `San Pablo City photo ${(selectedIndex ?? 0) + 1}`}
                 className="h-full w-full object-contain md:h-auto md:max-h-[80vh] md:rounded-lg md:shadow-2xl"
-                width={1200}
-                height={800}
               />
             </div>
             {selectedPhoto.caption && (

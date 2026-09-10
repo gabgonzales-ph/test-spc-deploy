@@ -43,22 +43,21 @@ const ArticleCard = ({
   item: Article;
   isFirst: boolean;
 }) => {
-  const imageSrc = item.featured_media?.file_path || PLACEHOLDER;
+  const initialSrc = item.featured_media?.file_path || PLACEHOLDER;
+  const [imgSrc, setImgSrc] = useState(initialSrc);
 
-  const handleError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    e.currentTarget.src = PLACEHOLDER;
+  const handleError = useCallback(() => {
+    setImgSrc(PLACEHOLDER);
   }, []);
 
   return (
     <article className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group hover:scale-105 h-full flex flex-col">
       <div className="relative w-full h-52 bg-emerald-900/5 flex items-center justify-center overflow-hidden">
-        <Image
-          src={imageSrc}
+        <img
+          src={imgSrc}
           alt={item.title || "News Image"}
-          fill
-          priority={isFirst}
-          sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 30vw"
-          className="object-contain p-2 z-10 transition-transform duration-300 group-hover:scale-110"
+          loading={isFirst ? "eager" : "lazy"}
+          className="absolute inset-0 w-full h-full object-contain p-2 z-10 transition-transform duration-300 group-hover:scale-110"
           onError={handleError}
         />
         <div className="absolute top-2 left-2 z-10">

@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { Calendar, Sparkles, ArrowUpRight, Heart } from "lucide-react";
 import type { TourismHighlight, TourismCategory } from "@/data/tourism/tourism";
@@ -89,12 +88,11 @@ function HighlightCard({
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
           {item.image ? (
-            <Image
+            <img
               src={item.image}
               alt={item.name}
-              fill
-              className="object-cover"
-              sizes="(min-width: 768px) 900px, 100vw"
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover"
             />
           ) : null}
         </motion.div>

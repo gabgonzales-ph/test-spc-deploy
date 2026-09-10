@@ -4,7 +4,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Building2, MapPin, Eye, Mountain, BookOpen, XIcon, Calendar, Users } from "lucide-react";
-import Image from "next/image";
 import dynamic from "next/dynamic";
 import { motion, type Variants } from "framer-motion";
 import Section from "@/components/city-government/Section";
@@ -78,15 +77,16 @@ const cityStats: Stat[] = [
 
 // ---------------------------------------------------------------------------
 // SevenLakesCarousel — auto-scrolling with pause on hover/interaction
-// Image URLs are now built from NEXT_PUBLIC_SUPABASE_URL instead of being
-// hardcoded to a specific Supabase project, so they follow whichever
-// project is currently configured in env vars.
+// Image URLs are built from NEXT_PUBLIC_SUPABASE_URL so they follow
+// whichever project is currently configured. Uses a plain <img> tag
+// (not next/image) to avoid Vercel Image Optimization quota/billing —
+// see NewsCard.tsx, ImageGallery.tsx, and Tourism.tsx for the same change.
 // ---------------------------------------------------------------------------
 
 interface Lake {
   name: string;
   description: string;
-  image: string; // filename only, e.g. "lakebunot_rev02-ssdiaries.jpg"
+  image: string; // filename only, e.g. "lakebunot_rev01-ssdiaries.webp"
 }
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -113,37 +113,37 @@ const SevenLakesCarousel = () => {
     {
       name: "Bunot Lake",
       description: "The smallest but most charming lake, surrounded by verdant landscapes.",
-      image: "lakebunot_rev02-ssdiaries.jpg",
+      image: "lakebunot_rev01-ssdiaries.webp",
     },
     {
       name: "Yambo Lake",
       description: "A picturesque lake offering stunning views and fishing opportunities.",
-      image: "lake_yambo20mod-crop-ssdiaries.jpg",
+      image: "lake_yambo20mod-crop-ssdiaries.webp",
     },
     {
       name: "Pandin Lake",
       description: "Famous for its bamboo raft rides and pristine natural beauty.",
-      image: "lakepandin-rev02-ssdiaries.jpg",
+      image: "lakepandin-rev02-ssdiaries.webp",
     },
     {
       name: "Mohicap Lake",
       description: "Known for its crystal-clear waters and tranquil atmosphere.",
-      image: "lake_mohicap14-ssd.jpg",
+      image: "lake_mohicap02-ssd.webp",
     },
     {
       name: "Calibato Lake",
       description: "A hidden gem with calm waters perfect for kayaking and nature walks.",
-      image: "lake_calibato01mod-ssdiaries.jpg",
+      image: "lake_calibato01mod-ssdiaries.webp",
     },
     {
       name: "Palakpakin Lake",
       description: "A serene lake surrounded by lush vegetation, ideal for peaceful retreats.",
-      image: "lake_palakpakin01ss_diaries.jpg",
+      image: "lake_palakpakin01ss_diaries.webp",
     },
     {
       name: "Sampaloc Lake",
       description: "The largest and most popular of the seven lakes, perfect for water activities and scenic views.",
-      image: "lakesampaloc00-ssdiaries.jpg",
+      image: "lakesampaloc00-ssdiaries.webp",
     },
   ];
 
@@ -216,11 +216,11 @@ const SevenLakesCarousel = () => {
                   }}
                 >
                   <div className="relative w-full h-64 overflow-hidden rounded-xl">
-                    <Image
+                    <img
                       src={getLakeImageUrl(lake.image)}
                       alt={lake.name}
-                      fill
-                      className="object-cover"
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                     <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
@@ -271,11 +271,10 @@ const SevenLakesCarousel = () => {
                     transition: "transform 0.1s ease-out",
                   }}
                 >
-                  <Image
+                  <img
                     src={getLakeImageUrl(selectedLake.image)}
                     alt={selectedLake.name}
-                    fill
-                    className="object-cover"
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
