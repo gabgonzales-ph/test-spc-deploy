@@ -97,7 +97,7 @@ export function HelpdeskCaptchaModal({ verified, onVerified, onExpired }: Helpde
         verified ? "opacity-0 scale-95 pointer-events-none" : "opacity-100 scale-100"
       }`}
     >
-      <div className="mx-4 flex flex-col items-center gap-3 rounded-xl bg-background px-5 py-6 shadow-lg ring-1 ring-black/5 text-center">
+      <div className="mx-4 flex flex-col items-center gap-3 bg-background px-5 py-6 shadow-lg ring-1 ring-black/5 text-center">
         <p className="text-[13px] text-foreground leading-relaxed">
           I-check ang kahon at sagutan ang katanungan upang magamit ang Help Desk.
         </p>
