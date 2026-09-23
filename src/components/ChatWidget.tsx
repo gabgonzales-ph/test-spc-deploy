@@ -17,6 +17,7 @@ import { ChatInputArea } from "./chat/ChatInputArea";
 import { ChatEnded }     from "./chat/ChatEnded";
 import { PreOpenBubble } from "./chat/ui/PreOpenBubble";
 import { JPAvatar }      from "./chat/ui/JPAvatar";
+import { HelpdeskCaptchaModal } from "./chat/ui/HelpdeskCaptchaModal";
 
 import { useInputGuard, isAfterCutoffPH, msUntilCutoffPH } from "@/hooks/useChatApi";
 
@@ -53,6 +54,7 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
 
   const [helpdeskText, setHelpdesk]     = useState("");
   const [formSubmitting, setSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [conversationId, setConvId]     = useState<number | null>(null);
   const [visitorToken, setVisitorToken] = useState<string | null>(null);
   const [liveMode, setLiveMode]         = useState(false);
@@ -314,6 +316,13 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
     return Object.keys(errors).length === 0;
   }
 
+  // The modal watches this token (via its `verified` prop) and resets its
+  // own checkbox internally when it goes back to null — nothing else to do
+  // here besides clearing the value.
+  function resetCaptcha() {
+    setCaptchaToken(null);
+  }
+
   function handleStartChat() {
     if (!validateForm()) return;
     try { localStorage.setItem(USER_KEY, JSON.stringify(userInfo)); } catch {}
@@ -367,20 +376,28 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
 
       // On the Help Desk node, not live yet — this message creates the conversation.
       if (currentNodeKey === "iba-pa") {
+        // Belt-and-suspenders: the Send button is already disabled without a
+        // token, but this covers the Enter-key path too.
+        if (!captchaToken) return;
+
         setSubmitting(true);
         const msgId = generateId();
         pushUserMessage(t);
 
         const result = await submitFeedback({
-          name:        userInfo.fullName,
-          email:       userInfo.email || null,
-          phone:       userInfo.phone || null,
-          subject:     "Iba Pa",
-          message:     t,
-          source_node: currentNodeKey,
+          name:           userInfo.fullName,
+          email:          userInfo.email || null,
+          phone:          userInfo.phone || null,
+          subject:        "Iba Pa",
+          message:        t,
+          source_node:    currentNodeKey,
+          recaptchaToken: captchaToken,
         });
 
         setSubmitting(false);
+        // A captcha token is single-use — always clear it after attempting,
+        // whether the submission succeeded or failed.
+        resetCaptcha();
 
         if (result.success && result.conversation_id && result.visitor_token) {
           setConvId(result.conversation_id);
@@ -444,7 +461,7 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
     if (!validate(clean, doSend)) return;
     doSend(clean);
   }, [cms, currentNodeKey, navigateTo, pushBotMessage, pushUserMessage,
-      liveMode, conversationId, visitorToken, validate, sanitizeInput, clearError, userInfo]);
+      liveMode, conversationId, visitorToken, validate, sanitizeInput, clearError, userInfo, captchaToken]);
 
   // ── Attachment send ───────────────────────────────────────────────────
   // Requires an existing conversation (visitor_token + conversationId), since
@@ -472,14 +489,26 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
 
         // No conversation yet — create one first (same as a Help Desk text message would).
         if (!convId || !token) {
+          if (!captchaToken) {
+            setIsTyping(true);
+            setTimeout(() => {
+              pushBotMessage("Kumpletuhin muna ang CAPTCHA bago magpadala.");
+              setIsTyping(false);
+            }, 300);
+            return;
+          }
+
           const created = await submitFeedback({
-            name:        userInfo.fullName,
-            email:       userInfo.email || null,
-            phone:       userInfo.phone || null,
-            subject:     "Iba Pa",
-            message:     initialMessage,
-            source_node: currentNodeKey,
+            name:           userInfo.fullName,
+            email:          userInfo.email || null,
+            phone:          userInfo.phone || null,
+            subject:        "Iba Pa",
+            message:        initialMessage,
+            source_node:    currentNodeKey,
+            recaptchaToken: captchaToken,
           });
+
+          resetCaptcha();
 
           if (!created.success || !created.conversation_id || !created.visitor_token) {
             setIsTyping(true);
@@ -595,6 +624,7 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
     setLiveMode(false);
     setHasUnread(false);
     setConvStatus(null);
+    setCaptchaToken(null);
     try {
       localStorage.removeItem(SESSION_CONV_KEY);
       localStorage.removeItem(SESSION_TOKEN_KEY);
@@ -626,6 +656,14 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
             : "opacity-0 invisible translate-y-3 scale-95 pointer-events-none"
         }`}
       >
+        {stage === "chat" && currentNodeKey === "iba-pa" && !liveMode && (
+          <HelpdeskCaptchaModal
+            verified={!!captchaToken}
+            onVerified={setCaptchaToken}
+            onExpired={() => setCaptchaToken(null)}
+          />
+        )}
+
         {stage === "form" && (
           <ChatForm
             userInfo={userInfo}

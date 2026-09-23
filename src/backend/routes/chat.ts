@@ -3,6 +3,7 @@
 import { Elysia, t } from "elysia";
 import { supabase } from "@/backend/config/database";
 import { randomBytes } from "crypto";
+import { verifyRecaptcha } from "../utils/recaptcha";
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const DOC_TYPES = ["application/pdf"];
@@ -46,8 +47,16 @@ export const chatRoutes = new Elysia({ prefix: "/chat" })
       request.headers.get("x-real-ip");
     const ip_address = forwardedFor ? forwardedFor.split(",")[0].trim() : null;
 
+        const captchaOk = await verifyRecaptcha(body.recaptchaToken, ip_address ?? "unknown");
+if (!captchaOk) {
+  set.status = 400;
+  return { success: false, error: "CAPTCHA verification failed. Please try again." };
+}
+
     // Generate a secure ownership token
     const visitor_token = randomBytes(32).toString("hex");
+
+
 
     const { data: conversation, error: convError } = await supabase
       .from("conversations")
@@ -100,6 +109,8 @@ export const chatRoutes = new Elysia({ prefix: "/chat" })
       subject:     t.String({ minLength: 1 }),
       message:     t.String({ minLength: 1 }),
       source_node: t.Optional(t.String()),
+      recaptchaToken: t.String({ minLength: 1 }),
+
     }),
   })
 

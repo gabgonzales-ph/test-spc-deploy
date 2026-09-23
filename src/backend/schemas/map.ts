@@ -7,6 +7,7 @@ export const cityOfficeSchema = t.Object({
   lat: t.Union([t.Number(), t.Null()]),
   lng: t.Union([t.Number(), t.Null()]),
   address: t.Optional(t.Union([t.String(), t.Null()])),
+  directions: t.Optional(t.Union([t.String(), t.Null()])),
   contact: t.Optional(t.Union([t.String(), t.Null()])),
   hours: t.Optional(t.Union([t.String(), t.Null()])),
   image: t.Optional(t.Union([t.String(), t.Null()])),

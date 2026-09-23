@@ -3,8 +3,9 @@
 
 import React, { useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, ZoomControl, useMap } from "react-leaflet";
+
 import L from "leaflet";
-import { Search, X, MapPin, Phone, Clock, WifiOff, ChevronDown, ArrowLeft } from "lucide-react";
+import { Search, X, MapPin, ArrowLeftRight, Phone, Clock, WifiOff, ChevronDown, ArrowLeft } from "lucide-react";
 import type { CityOffice } from "@/data/map/map";
 import { useMapOffices } from "@/hooks/useMap";
 import "leaflet/dist/leaflet.css";
@@ -186,6 +187,7 @@ function DestinationSidebar({
       }`}
       aria-hidden={!isOpen}
     >
+
         {parentOffice && displayedOffice && (
           <div className="flex flex-col h-full">
             {/* Image */}
@@ -238,7 +240,14 @@ function DestinationSidebar({
                 />
               )}
 
+
               <div className="space-y-4">
+                                    {displayedOffice.directions && (
+  <div className="flex items-start gap-3">
+    <ArrowLeftRight className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+    <p className="text-sm text-gray-700">{displayedOffice.directions}</p>
+  </div>
+)}
                 {displayedOffice.address && (
                   <div className="flex items-start gap-3">
                     <MapPin className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
@@ -340,7 +349,16 @@ function MobileDestinationPanel({
             />
           )}
 
+
           <div className="space-y-3">
+
+                      {displayedOffice.directions && (
+  <div className="flex items-start gap-3">
+    <ArrowLeftRight className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+    <p className="text-sm text-gray-700">{displayedOffice.directions}</p>
+  </div>
+)}
+
             {displayedOffice.address && (
               <div className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />

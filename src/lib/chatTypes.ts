@@ -70,6 +70,7 @@ export interface ComplaintPayload {
   message:      string;
   source_node?: string | null;
   ip_address?:  string | null;
+  recaptchaToken:  string;   // ← new, required
 }
 
 export function generateId(): string {

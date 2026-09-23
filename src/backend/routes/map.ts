@@ -11,7 +11,7 @@ export const mapRoutes = new Elysia({ prefix: "/map" }).get(
     const { data, error } = await supabase
       .from("map")
       .select(
-        "id, name, lat, lng, address, contact, hours, image, description, sort_order, offices"
+        "id, name, lat, lng, address, directions, contact, hours, image, description, sort_order, offices"
       )
       .order("sort_order", { ascending: true });
 

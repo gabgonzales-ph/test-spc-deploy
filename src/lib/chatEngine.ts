@@ -147,6 +147,7 @@ export async function submitFeedback(
         subject:     payload.subject,
         message:     payload.message,
         source_node: payload.source_node ?? null,
+        recaptchaToken: payload.recaptchaToken,   // ← new
       }),
     });
     const data = await res.json();

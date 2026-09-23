@@ -5,6 +5,7 @@ export interface CityOffice {
   name: string;
   lat: number | null;
   lng: number | null;
+  directions?: string | null;
   address?: string | null;
   contact?: string | null;
   hours?: string | null;
