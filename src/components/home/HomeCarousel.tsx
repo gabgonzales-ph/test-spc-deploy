@@ -53,7 +53,9 @@ function ImageCarouselItem({
     <CarouselItem className="pl-2 md:pl-4">
       <div className="relative rounded-2xl overflow-hidden group">
         {/* Mobile: image fits its own natural aspect ratio, no cropping/letterboxing */}
-        <div className="relative w-full sm:hidden">
+        <div className="relative w-full sm:hidden cursor-pointer"
+        onClick={onToggle}>
+     
           <Image
             src={src}
             alt={alt}
@@ -70,6 +72,18 @@ function ImageCarouselItem({
           {hasText && (
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent transition-opacity duration-500 group-hover:opacity-0" />
           )}
+
+            {showIcon && (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="bg-black/50 rounded-full p-5 animate-[fadeOut_0.6s_ease-in-out]">
+        {isPlaying ? (
+          <Play className="w-10 h-10 text-white fill-white" />
+        ) : (
+          <Pause className="w-10 h-10 text-white fill-white" />
+        )}
+      </div>
+    </div>
+  )}
 
           {hasText && (
             <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
@@ -88,7 +102,9 @@ function ImageCarouselItem({
         </div>
 
         {/* sm and up: fixed-height container with blurred background + contained image */}
-        <div className="hidden sm:block relative w-full sm:h-[70vh] md:h-[80vh] overflow-hidden">
+        <div className="hidden sm:block relative w-full sm:h-[70vh] md:h-[80vh] overflow-hidden cursor-pointer"
+        onClick={onToggle}>
+
 
           {isActive && (
             <Image
