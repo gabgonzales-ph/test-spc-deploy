@@ -2,35 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 
+// Client-side guard: input hygiene and a short burst window for instant UX
+// feedback. The server is the authority on operating hours, the after-hours
+// acknowledgement and the daily caps (100 during operating hours, 25 after
+// hours), so there is no daily counter here anymore.
+
 const MAX_LEN       = 1000;
-const DAY_CAP       = 25;
 const RATE_WINDOW   = 4_000;
-const DAY_KEY       = "jp_msg_day";
-const CNT_KEY       = "jp_msg_count";
 const LAST_SENT_KEY = "jp_last_sent";
 const SPAM_RE       = /https?:\/\/|(\S)\1{6,}|[^\w\s,.!?'"()\-:]{4,}/i;
-
-// ── Help desk session cutoff (5:00 PM Philippine Standard Time, UTC+8, no DST) ──
-const CUTOFF_HOUR_PH = 17;
-
-export function isAfterCutoffPH(): boolean {
-  const now = new Date();
-  const phHour = (now.getUTCHours() + 8) % 24;
-  return phHour >= CUTOFF_HOUR_PH;
-}
-
-export function msUntilCutoffPH(): number {
-  const now = new Date();
-  const phMillisToday =
-    ((now.getUTCHours() + 8) % 24) * 3_600_000 +
-    now.getUTCMinutes() * 60_000 +
-    now.getUTCSeconds() * 1_000 +
-    now.getUTCMilliseconds();
-  const cutoffMillis = CUTOFF_HOUR_PH * 3_600_000;
-  const diff = cutoffMillis - phMillisToday;
-  // If we're already past cutoff, this is negative/zero — caller should treat as "now".
-  return diff > 0 ? diff : 0;
-}
 
 export function sanitizeInput(raw: string): string {
   return raw
@@ -40,21 +20,6 @@ export function sanitizeInput(raw: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, MAX_LEN);
-}
-
-function getDayCount(): number {
-  try {
-    const today = new Date().toDateString();
-    if (localStorage.getItem(DAY_KEY) !== today) {
-      localStorage.setItem(DAY_KEY, today);
-      localStorage.setItem(CNT_KEY, "0");
-    }
-    return parseInt(localStorage.getItem(CNT_KEY) ?? "0", 10);
-  } catch { return 0; }
-}
-
-function incrementDayCount() {
-  try { localStorage.setItem(CNT_KEY, String(getDayCount() + 1)); } catch {}
 }
 
 function getLastSentAt(): number {
@@ -86,9 +51,8 @@ export function useInputGuard() {
     return () => clearTimeout(t);
   }, [cooldownUntil]);
 
-  // Shared rate-limit / daily-cap gate. Consumes one "slot" (day count +
-  // last-sent timestamp) whenever a send is allowed to proceed — either
-  // immediately, or scheduled via onDelayed once the rate window clears.
+  // Shared burst gate. If a send arrives inside the rate window and the caller
+  // supplied onDelayed, it is scheduled for when the window clears.
   function checkLimit(onDelayed?: () => void): boolean {
     const now     = Date.now();
     const elapsed = now - getLastSentAt();
@@ -96,7 +60,6 @@ export function useInputGuard() {
     if (elapsed < RATE_WINDOW) {
       if (onDelayed) {
         setLastSentAt(now);
-        incrementDayCount();
         setError(null);
         pendingRef.current = onDelayed;
         setCooldownUntil(now + RATE_WINDOW - elapsed); // remaining ms, not a new full window
@@ -104,18 +67,12 @@ export function useInputGuard() {
       return false;
     }
 
-    if (getDayCount() >= DAY_CAP) {
-      setError("Daily message limit reached. Please try again tomorrow.");
-      return false;
-    }
-
     setLastSentAt(now);
-    incrementDayCount();
     setError(null);
     return true;
   }
 
-  // Text-message path — sanitizes/spam-checks first, then applies the shared gate.
+  // Text-message path — sanitizes/spam-checks first, then applies the burst gate.
   function validate(text: string, onDelayed?: (t: string) => void): boolean {
     const t = sanitizeInput(text);
 
@@ -127,20 +84,15 @@ export function useInputGuard() {
     return checkLimit(onDelayed ? () => onDelayed(t) : undefined);
   }
 
-  // Attachment path — no text to sanitize/spam-check, but still burns the
-  // same daily cap and rate-limit window as a text message.
+  // Attachment path — no text to sanitize/spam-check, same burst window.
   function validateAttachment(onDelayed?: () => void): boolean {
     return checkLimit(onDelayed);
   }
 
   function clearError() { setError(null); }
 
-  function getRemainingCount(): number {
-    return Math.max(0, DAY_CAP - getDayCount());
-  }
-
   return {
     validate, validateAttachment, sanitizeInput,
-    error, clearError, getRemainingCount, cooldownUntil,
+    error, clearError, cooldownUntil,
   };
 }

@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Send } from "lucide-react";
-import { choiceBtnClass, fadeInUp, inputClass } from "./csmContent";
+import { choiceBtnClass, fadeInUp, inputClass, orderSqdOptions, SQD_ICONS } from "./csmContent";
 import { RadioGroup } from "./RadioGroup";
 import type { ClientType, Sex } from "./types";
 import type { UseCSMFormReturn } from "@/hooks/useCSMForm";
+
 
 type Props = { csm: UseCSMFormReturn };
 
@@ -221,7 +222,14 @@ export function CSMBody({ csm }: Props) {
                 compact
                 fieldRef={registerField(key)}
                 errorText={fieldError?.field === key ? fieldError.message : undefined}
-                options={t.sqdOptions.map((label, i) => ({ value: i, label }))}
+                options={orderSqdOptions(
+  t.sqdOptions.map((label, i) => ({
+    value: i,
+    label,
+    icon: SQD_ICONS[i].icon,
+    iconTone: SQD_ICONS[i].tone,
+  }))
+)}
                 value={sqdDisplayIndex(form[key])}
                 onChange={(displayIndex) => setSqd(key, displayIndex)}
               />

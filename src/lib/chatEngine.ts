@@ -2,7 +2,6 @@
 // chatEngine.ts — Dynamic flow engine
 // ─────────────────────────────────────────────
 
-
 //spc-website\src\lib\chatEngine.ts
 import {
   STATIC_FLOW_NODES,
@@ -10,7 +9,7 @@ import {
   MAIN_MENU_KEY,
   FlowNode,
 } from "./flowData";
-import { CMSContent, CMSFaq, CMSService, ComplaintPayload } from "./chatTypes";
+import { CMSContent, ComplaintPayload } from "./chatTypes";
 
 // ── Dynamic node registry (built from CMS) ────────────────────────────────
 // Merged with STATIC_FLOW_NODES at runtime
@@ -42,7 +41,6 @@ export function buildDynamicNodes(cms: CMSContent): void {
     };
 
     serviceOptions.push({ label: svc.name, value: nodeKey });
-    // ← no "Iba Pa" appended here anymore
   }
 
   newNodes["serbisyo"] = {
@@ -129,36 +127,56 @@ export function injectContent(template: string, _cms: CMSContent): string {
   return template; // content is already resolved in buildDynamicNodes()
 }
 
-// ── Feedback ──────────────────────────────────────────────────────────────
-
-// Only the two functions change — everything else stays the same
+// ── Help desk API ─────────────────────────────────────────────────────────
+// The server is the authority on operating hours, the after-hours
+// acknowledgement, burst limits and daily caps. It answers:
+//   400 { closed: true }               conversation is closed
+//   428 { needsAck: true }             after-hours notice not acknowledged yet
+//   429 { burst: true, retryAfterMs }  too soon after the previous message
+//   429 { limitReached: true }         daily cap hit
 
 export async function submitFeedback(
-  payload: ComplaintPayload & { source_node?: string }
-): Promise<{ success: boolean; conversation_id?: number; visitor_token?: string; status?: string; error?: string }> {
+  payload: ComplaintPayload & { source_node?: string; ack_after_hours?: boolean }
+): Promise<{
+  success: boolean;
+  conversation_id?: number;
+  visitor_token?: string;
+  status?: string;
+  after_hours?: boolean;
+  needsAck?: boolean;
+  limitReached?: boolean;
+  error?: string;
+}> {
   try {
     const res = await fetch("/api/chat/conversations", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        full_name:   payload.name,
-        email:       payload.email       ?? null,
-        phone:       payload.phone       ?? null,
-        subject:     payload.subject,
-        message:     payload.message,
-        source_node: payload.source_node ?? null,
-        recaptchaToken: payload.recaptchaToken,   // ← new
+        full_name:       payload.name,
+        email:           payload.email       ?? null,
+        phone:           payload.phone       ?? null,
+        subject:         payload.subject,
+        message:         payload.message,
+        source_node:     payload.source_node ?? null,
+        recaptchaToken:  payload.recaptchaToken,
+        ack_after_hours: payload.ack_after_hours ?? false,
       }),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
-      return { success: false, error: data?.error ?? "Hindi natanggap ang mensahe." };
+      return {
+        success:  false,
+        needsAck: data?.needsAck,
+        limitReached: data?.limitReached,
+        error:    data?.error ?? "Hindi natanggap ang mensahe.",
+      };
     }
     return {
-      success:        true,
+      success:         true,
       conversation_id: data.conversation_id,
-      visitor_token:  data.visitor_token,
-      status:         data.status,
+      visitor_token:   data.visitor_token,
+      status:          data.status,
+      after_hours:     data.after_hours,
     };
   } catch {
     return { success: false, error: "Network error. Subukan ulit." };
@@ -169,16 +187,35 @@ export async function sendFollowUp(
   conversationId: number,
   content: string,
   visitorToken: string,
-): Promise<{ success: boolean; closed?: boolean; error?: string }> {
+  ackAfterHours = false,
+): Promise<{
+  success: boolean;
+  closed?: boolean;
+  needsAck?: boolean;
+  burst?: boolean;
+  retryAfterMs?: number;
+  error?: string;
+}> {
   try {
     const res = await fetch(`/api/chat/conversations/${conversationId}/messages`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, visitor_token: visitorToken }),
+      body: JSON.stringify({
+        content,
+        visitor_token:   visitorToken,
+        ack_after_hours: ackAfterHours,
+      }),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
-      return { success: false, closed: data?.closed, error: data?.error ?? "Hindi natanggap ang mensahe." };
+      return {
+        success:      false,
+        closed:       data?.closed,
+        needsAck:     data?.needsAck,
+        burst:        data?.burst,
+        retryAfterMs: data?.retryAfterMs,
+        error:        data?.error ?? "Hindi natanggap ang mensahe.",
+      };
     }
     return { success: true };
   } catch {

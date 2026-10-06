@@ -116,7 +116,7 @@ function OfficesDropdown({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="mb-3 w-full">
+    <div className="mb-3 mt-3 w-full">
       <div className="group relative w-full">
         <select
           value={selectedId}
@@ -151,7 +151,7 @@ function ReturnToBuildingButton({
   return (
     <button
       onClick={onClick}
-      className="mb-4 flex w-full items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3.5 py-2.5 text-left text-sm font-medium text-emerald-700 transition-colors duration-150 hover:bg-emerald-100/80 hover:border-emerald-200"
+      className="mb-4 mt-3 flex w-full items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3.5 py-2.5 text-left text-sm font-medium text-emerald-700 transition-colors duration-150 hover:bg-emerald-100/80 hover:border-emerald-200"
     >
       <ArrowLeft className="w-4 h-4 shrink-0" />
       <span className="truncate">

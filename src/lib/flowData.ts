@@ -42,7 +42,7 @@ export const STATIC_FLOW_NODES: Record<string, FlowNode> = {
 
   "iba-pa": {
     key: "iba-pa",
-    message: "Isend ang iyong tanong para masagot ng aming help desk.",
+    message: "Isend ang iyong tanong para masagot ng aming staff.",
     options: [],
     inputMode: "free-text",
     isTerminal: true,

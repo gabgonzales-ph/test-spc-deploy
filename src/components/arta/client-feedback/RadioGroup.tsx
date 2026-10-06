@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import { choiceBtnClass } from "./csmContent";
 
 // ---------------------------------------------------------------------
@@ -16,7 +17,7 @@ export function RadioGroup({
   errorText,
 }: {
   title: string;
-  options: { value: number; label: string }[];
+options: { value: number; label: string; icon?: LucideIcon; iconTone?: string }[];
   value: number | null;
   onChange: (value: number) => void;
   required?: boolean;
@@ -33,17 +34,33 @@ export function RadioGroup({
       </p>
       {helperText && <p className="mb-2 text-[12px] text-gray-400">{helperText}</p>}
       <div className={`grid gap-2 ${compact ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(opt.value)}
-            className={choiceBtnClass(value === opt.value, disabled)}
-          >
-            {opt.label}
-          </button>
-        ))}
+{options.map((opt) => {
+  const selected = value === opt.value;
+  const Icon = opt.icon;
+  return (
+    <button
+      key={opt.value}
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(opt.value)}
+      className={choiceBtnClass(selected, disabled)}
+    >
+      {Icon ? (
+        <span className="flex w-full flex-col items-center gap-1.5 text-center">
+          <Icon
+            aria-hidden="true"
+            className={`h-6 w-6 transition-colors duration-150 ${
+              selected ? opt.iconTone ?? "text-emerald-600" : "text-gray-400"
+            }`}
+          />
+          {opt.label}
+        </span>
+      ) : (
+        opt.label
+      )}
+    </button>
+  );
+})}
       </div>
       {errorText && <p className="mt-1.5 text-[12px] text-red-600">{errorText}</p>}
     </div>

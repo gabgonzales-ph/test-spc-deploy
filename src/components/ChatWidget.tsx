@@ -18,11 +18,42 @@ import { ChatEnded }     from "./chat/ChatEnded";
 import { PreOpenBubble } from "./chat/ui/PreOpenBubble";
 import { JPAvatar }      from "./chat/ui/JPAvatar";
 import { HelpdeskCaptchaModal } from "./chat/ui/HelpdeskCaptchaModal";
+import { AfterHoursNotice }     from "./chat/ui/AfterHoursNotice";
 
-import { useInputGuard, isAfterCutoffPH, msUntilCutoffPH } from "@/hooks/useChatApi";
+import { useInputGuard } from "@/hooks/useChatApi";
 
-const CLOSED_HOURS_MESSAGE =
-  "Ang chat support ay bukas lamang hanggang 5:00 PM. Ang usapang ito ay awtomatikong natapos. Maaari kang magsimula muli bukas.";
+const CLOSED_MESSAGE =
+  "Natapos na ang usapang ito. Maaari kang magsimula ng bagong chat.";
+
+const LIMIT_MESSAGE =
+  "Naabot mo na ang limits ng paggamit ng Help Desk. Subukan muli bukas.";
+
+const ACK_KEY   = "jp_ah_ack";     // PH date (YYYY-MM-DD) of the last after-hours acknowledgement
+const LIMIT_KEY = "jp_limit_day";  // PH date (YYYY-MM-DD) on which the new-chat limit was hit
+const phToday = () => new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+
+function afterHoursReceived(nextOpenAt: string | null) {
+  const when = nextOpenAt
+    ? new Date(nextOpenAt).toLocaleDateString("en-PH", {
+        weekday: "long", month: "long", day: "numeric", timeZone: "Asia/Manila",
+      })
+    : "susunod na araw ng trabaho";
+  return `✅ Natanggap namin ang iyong mensahe. Ngunit bukas lamang ang Help Desk 8AM - 5PM, Mon - Fri. Babalikan namin ang iyong mensahe sa lalong madaling panahon, salamat!`;
+}
+
+const NEEDS_ACK_MESSAGE =
+  "Pakikumpirma muna ang abiso ng help desk, pagkatapos ay ipadala muli ang mensahe.";
+
+// Shape of the upload endpoint's JSON response
+type UploadResult = {
+  success?: boolean;
+  data?: { attachment_url: string; attachment_type: string; attachment_size?: number };
+  closed?: boolean;
+  needsAck?: boolean;
+  burst?: boolean;
+  retryAfterMs?: number;
+  error?: string;
+};
 
 const supabaseRealtime = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,7 +81,7 @@ export default function ChatWidget() {
   const [history, setHistory]        = useState<string[]>([]);
   const [menuOpen, setMenuOpen]      = useState(false);
 
-const { validate, validateAttachment, sanitizeInput, error: inputError, clearError, getRemainingCount, cooldownUntil } = useInputGuard();
+  const { validate, validateAttachment, sanitizeInput, error: inputError, clearError, cooldownUntil } = useInputGuard();
 
   const [helpdeskText, setHelpdesk]     = useState("");
   const [formSubmitting, setSubmitting] = useState(false);
@@ -59,8 +90,19 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
   const [visitorToken, setVisitorToken] = useState<string | null>(null);
   const [liveMode, setLiveMode]         = useState(false);
   const [hasUnread, setHasUnread]       = useState(false); // red dot on bubble
-  const [convStatus, setConvStatus]     = useState<string | null>(null); // ← Added status state
+  const [convStatus, setConvStatus]     = useState<string | null>(null);
   const [uploading, setUploading]       = useState(false); // attachment upload in progress
+
+  // Help desk hours (server is the authority) + after-hours acknowledgement
+  const [hours, setHours]       = useState<{ open: boolean; nextOpenAt: string | null }>({ open: true, nextOpenAt: null });
+  const [ackDate, setAckDate]   = useState<string | null>(null);
+  const ackToday = ackDate === phToday();
+
+  // New-chat limit (per-IP cap on new conversations). Stored as a PH date so it
+  // survives reloads and expires on its own at PH midnight. While set, the
+  // captcha modal stays hidden and no creation request is attempted.
+  const [limitDate, setLimitDate] = useState<string | null>(null);
+  const limitReached = limitDate === phToday();
 
   const channelRef = useRef<ReturnType<typeof supabaseRealtime.channel> | null>(null);
 
@@ -72,6 +114,9 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
     try {
       const savedUser  = localStorage.getItem(USER_KEY);
       if (savedUser) setUserInfo(JSON.parse(savedUser) as UserInfo);
+
+      setAckDate(localStorage.getItem(ACK_KEY));
+      setLimitDate(localStorage.getItem(LIMIT_KEY));
 
       const savedConvId = localStorage.getItem(SESSION_CONV_KEY);
       const savedToken  = localStorage.getItem(SESSION_TOKEN_KEY);
@@ -137,29 +182,43 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
       .catch(() => setCms(p => ({ ...p, loaded: true, error: "CMS unavailable." })));
   }, []);
 
-  // ── 5PM PH help-desk cutoff ────────────────────────────────────────────
-  // Mirrors the backend's enforceCutoff: if it's already past 5PM PH, close
-  // immediately; otherwise schedule a check for exactly when 5PM PH hits,
-  // plus a periodic safety-net check in case the tab was backgrounded/slept.
+  // ── Help desk hours ───────────────────────────────────────────────────
+  // The server decides whether the help desk is in operating hours
+  // (Mon–Fri 8AM–5PM PHT). Outside those hours visitors can still leave
+  // messages, but must acknowledge a notice first.
 
   useEffect(() => {
-    if (!liveMode || convStatus === "closed") return;
+    if (!isOpen) return;
+    let alive = true;
+    const load = () =>
+      fetch("/api/chat/status")
+        .then(r => r.json())
+        .then(j => {
+          if (alive && j?.success) setHours({ open: j.open, nextOpenAt: j.nextOpenAt });
+        })
+        .catch(() => {});
+    load();
+    const id = setInterval(load, 60_000);
+    return () => { alive = false; clearInterval(id); };
+  }, [isOpen]);
 
-    function checkCutoff() {
-      if (isAfterCutoffPH()) {
-        setConvStatus("closed");
-        setMessages(prev => [...prev, {
-          id: generateId(), role: "bot", text: CLOSED_HOURS_MESSAGE, timestamp: new Date(),
-        }]);
-      }
-    }
+  const clearAck = useCallback(() => {
+    setAckDate(null);
+    try { localStorage.removeItem(ACK_KEY); } catch {}
+  }, []);
 
-    checkCutoff();
-    const atCutoff  = setTimeout(checkCutoff, msUntilCutoffPH());
-    const safetyNet = setInterval(checkCutoff, 60_000);
+  function acknowledgeAfterHours() {
+    const d = phToday();
+    setAckDate(d);
+    try { localStorage.setItem(ACK_KEY, d); } catch {}
+  }
 
-    return () => { clearTimeout(atCutoff); clearInterval(safetyNet); };
-  }, [liveMode, convStatus]);
+  // Remember that the new-chat limit was hit today (expires at PH midnight)
+  const markLimitReached = useCallback(() => {
+    const d = phToday();
+    setLimitDate(d);
+    try { localStorage.setItem(LIMIT_KEY, d); } catch {}
+  }, []);
 
   // ── Bubble / open-chat event ──────────────────────────────────────────
 
@@ -351,31 +410,59 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
 
     async function doSend(t: string) {
       // Already talking to a human agent — just forward the follow-up.
+      // The server enforces closed status, the after-hours acknowledgement,
+      // burst limits and the daily caps.
       if (liveMode && conversationId && visitorToken) {
-        if (isAfterCutoffPH()) {
-          setConvStatus("closed");
-          pushBotMessage(CLOSED_HOURS_MESSAGE);
-          return;
-        }
         pushUserMessage(t);
-        sendFollowUp(conversationId, t, visitorToken).then(result => {
-          if (!result.success) {
+
+        const trySend = (attempt: number) => {
+          sendFollowUp(conversationId, t, visitorToken, ackToday).then(result => {
+            // Server burst check: no error text and no bot typing dots. Keep the
+            // input spinner on (formSubmitting) and retry once the window clears.
+            if (result.burst && attempt < 3) {
+              setSubmitting(true);
+              setTimeout(() => trySend(attempt + 1), (result.retryAfterMs ?? 3000) + 100);
+              return;
+            }
+
+            setSubmitting(false);
+            if (result.success) return;
+
+            if (result.burst) {
+              pushBotMessage("Hindi naipadala ang mensahe. Pakisubukan muli.");
+              return;
+            }
             if (result.closed) {
               setConvStatus("closed");
               setIsTyping(true);
-              setTimeout(() => { pushBotMessage(CLOSED_HOURS_MESSAGE); setIsTyping(false); }, 400);
+              setTimeout(() => { pushBotMessage(CLOSED_MESSAGE); setIsTyping(false); }, 400);
+              return;
+            }
+            if (result.needsAck) {
+              setHours(h => ({ ...h, open: false }));
+              clearAck();
+              pushBotMessage(NEEDS_ACK_MESSAGE);
               return;
             }
             setIsTyping(true);
-            setTimeout(() => { pushBotMessage(`May error: ${result.error}`); setIsTyping(false); }, 400);
-          }
-        });
+            setTimeout(() => { pushBotMessage(`${result.error}`); setIsTyping(false); }, 400);
+          });
+        };
+
+        trySend(0);
         clearError();
         return;
       }
 
       // On the Help Desk node, not live yet — this message creates the conversation.
       if (currentNodeKey === "iba-pa") {
+        // New-chat limit already hit today — don't attempt creation.
+        if (limitReached) {
+          pushUserMessage(t);
+          pushBotMessage(LIMIT_MESSAGE);
+          return;
+        }
+
         // Belt-and-suspenders: the Send button is already disabled without a
         // token, but this covers the Enter-key path too.
         if (!captchaToken) return;
@@ -385,26 +472,36 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
         pushUserMessage(t);
 
         const result = await submitFeedback({
-          name:           userInfo.fullName,
-          email:          userInfo.email || null,
-          phone:          userInfo.phone || null,
-          subject:        "Iba Pa",
-          message:        t,
-          source_node:    currentNodeKey,
-          recaptchaToken: captchaToken,
+          name:            userInfo.fullName,
+          email:           userInfo.email || null,
+          phone:           userInfo.phone || null,
+          subject:         "Iba Pa",
+          message:         t,
+          source_node:     currentNodeKey,
+          recaptchaToken:  captchaToken,
+          ack_after_hours: ackToday,
         });
 
         setSubmitting(false);
-        // A captcha token is single-use — always clear it after attempting,
-        // whether the submission succeeded or failed.
+
+        // The server rejects the new-chat limit BEFORE verifying the captcha,
+        // so the token was not spent. Stop here: no captcha reset, and the
+        // modal stays hidden because limitReached is now set.
+        if (result.limitReached) {
+          markLimitReached();
+          pushBotMessage(LIMIT_MESSAGE);
+          return;
+        }
+
+        // A captcha token is single-use — clear it after any attempt that
+        // reached verification, whether the submission succeeded or failed.
         resetCaptcha();
 
         if (result.success && result.conversation_id && result.visitor_token) {
           setConvId(result.conversation_id);
           setVisitorToken(result.visitor_token);
           setLiveMode(true);
-          const closedOnArrival = result.status === "closed" || isAfterCutoffPH();
-          setConvStatus(closedOnArrival ? "closed" : "open");
+          setConvStatus(result.status === "closed" ? "closed" : "open");
 
           try {
             localStorage.setItem(SESSION_CONV_KEY,  String(result.conversation_id));
@@ -416,16 +513,20 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
 
           setTimeout(() => {
             pushBotMessage(
-              closedOnArrival
-                ? CLOSED_HOURS_MESSAGE
+              result.after_hours
+                ? afterHoursReceived(hours.nextOpenAt)
                 : "✅ Natanggap ang iyong mensahe! Abangan ang tugon ng aming staff. Maaari kang mag-type ng karagdagang tanong habang naghihintay."
             );
           }, 600);
 
           setNodeKey(MAIN_MENU_KEY);
+        } else if (result.needsAck) {
+          setHours(h => ({ ...h, open: false }));
+          clearAck();
+          pushBotMessage(NEEDS_ACK_MESSAGE);
         } else if (!result.success) {
           setIsTyping(true);
-          setTimeout(() => { pushBotMessage(`May error: ${result.error}`); setIsTyping(false); }, 600);
+          setTimeout(() => { pushBotMessage(`${result.error}`); setIsTyping(false); }, 600);
         }
         return;
       }
@@ -461,14 +562,19 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
     if (!validate(clean, doSend)) return;
     doSend(clean);
   }, [cms, currentNodeKey, navigateTo, pushBotMessage, pushUserMessage,
-      liveMode, conversationId, visitorToken, validate, sanitizeInput, clearError, userInfo, captchaToken]);
+      liveMode, conversationId, visitorToken, validate, sanitizeInput, clearError,
+      userInfo, captchaToken, ackToday, hours.nextOpenAt, clearAck,
+      limitReached, markLimitReached]);
 
   // ── Attachment send ───────────────────────────────────────────────────
   // Requires an existing conversation (visitor_token + conversationId), since
   // the upload endpoint is scoped to /chat/conversations/:id/upload.
-  // Gated by validateAttachment so it burns the same daily cap / rate-limit
-  // window as a text message — if the window is still open, the actual
-  // upload is deferred (doSend) and retried automatically once it clears.
+  // Gated by validateAttachment so it shares the same burst window as a text
+  // message — if the window is still open, the actual upload is deferred
+  // (doSend) and retried automatically once it clears. The server enforces
+  // the closed status, the after-hours acknowledgement and the daily caps;
+  // a server-side burst rejection is retried silently while `uploading`
+  // keeps the spinner on.
 
   function handleAttachmentSend(file: File, caption: string) {
     async function doSend() {
@@ -476,19 +582,19 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
       try {
         let convId = conversationId;
         let token  = visitorToken;
+        let createdAfterHours = false;
 
         const fallbackLabel = file.type.startsWith("image/") ? "📷 Photo" : "📎 File";
         const initialMessage = caption || fallbackLabel;
 
-        // Existing live conversation — don't let it slip an attachment past cutoff.
-        if (convId && token && isAfterCutoffPH()) {
-          setConvStatus("closed");
-          pushBotMessage(CLOSED_HOURS_MESSAGE);
-          return;
-        }
-
         // No conversation yet — create one first (same as a Help Desk text message would).
         if (!convId || !token) {
+          // New-chat limit already hit today — don't attempt creation.
+          if (limitReached) {
+            pushBotMessage(LIMIT_MESSAGE);
+            return;
+          }
+
           if (!captchaToken) {
             setIsTyping(true);
             setTimeout(() => {
@@ -499,34 +605,51 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
           }
 
           const created = await submitFeedback({
-            name:           userInfo.fullName,
-            email:          userInfo.email || null,
-            phone:          userInfo.phone || null,
-            subject:        "Iba Pa",
-            message:        initialMessage,
-            source_node:    currentNodeKey,
-            recaptchaToken: captchaToken,
+            name:            userInfo.fullName,
+            email:           userInfo.email || null,
+            phone:           userInfo.phone || null,
+            subject:         "Iba Pa",
+            message:         initialMessage,
+            source_node:     currentNodeKey,
+            recaptchaToken:  captchaToken,
+            ack_after_hours: ackToday,
           });
+
+          // Rejected before captcha verification: token not spent, keep the
+          // modal hidden and skip resetCaptcha().
+          if (created.limitReached) {
+            markLimitReached();
+            pushBotMessage(LIMIT_MESSAGE);
+            return;
+          }
 
           resetCaptcha();
 
+          if (created.needsAck) {
+            setHours(h => ({ ...h, open: false }));
+            clearAck();
+            pushBotMessage(NEEDS_ACK_MESSAGE);
+            return;
+          }
+
           if (!created.success || !created.conversation_id || !created.visitor_token) {
             setIsTyping(true);
-            setTimeout(() => { pushBotMessage(`May error: ${created.error}`); setIsTyping(false); }, 400);
+            setTimeout(() => { pushBotMessage(`${created.error}`); setIsTyping(false); }, 400);
             return;
           }
 
           convId = created.conversation_id;
           token  = created.visitor_token;
+          createdAfterHours = !!created.after_hours;
 
           setConvId(convId);
           setVisitorToken(token);
           setLiveMode(true);
-          const closedOnArrival = created.status === "closed" || isAfterCutoffPH();
+          const closedOnArrival = created.status === "closed";
           setConvStatus(closedOnArrival ? "closed" : "open");
 
           if (closedOnArrival) {
-            pushBotMessage(CLOSED_HOURS_MESSAGE);
+            pushBotMessage(CLOSED_MESSAGE);
             return;
           }
 
@@ -542,16 +665,23 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
         const formData = new FormData();
         formData.append("file", file);
         formData.append("visitor_token", token);
+        formData.append("ack_after_hours", ackToday ? "true" : "false");
         // If we just created the conversation, its first message already carries
         // `initialMessage` — don't duplicate that text onto the attachment row too.
         const isNewConversation = convId !== conversationId;
         if (!isNewConversation && caption) formData.append("content", caption);
 
-        const res = await fetch(`/api/chat/conversations/${convId}/upload`, {
-          method: "POST",
-          body: formData,
-        });
-        const result = await res.json();
+        // Silent retry if the server's burst check rejects the upload.
+        let result: UploadResult = {};
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const res = await fetch(`/api/chat/conversations/${convId}/upload`, {
+            method: "POST",
+            body: formData,
+          });
+          result = await res.json();
+          if (!result.burst) break;
+          await new Promise(r => setTimeout(r, (result.retryAfterMs ?? 3000) + 100));
+        }
 
         if (result.success && result.data) {
           pushUserMessage(
@@ -565,13 +695,24 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
           if (isNewConversation) {
             setTimeout(() => {
               pushBotMessage(
-                "✅ Natanggap ang iyong mensahe! Abangan ang tugon ng aming staff."
+                createdAfterHours
+                  ? afterHoursReceived(hours.nextOpenAt)
+                  : "✅ Natanggap ang iyong mensahe! Abangan ang tugon ng aming staff."
               );
             }, 600);
           }
+        } else if (result.closed) {
+          setConvStatus("closed");
+          pushBotMessage(CLOSED_MESSAGE);
+        } else if (result.needsAck) {
+          setHours(h => ({ ...h, open: false }));
+          clearAck();
+          pushBotMessage(NEEDS_ACK_MESSAGE);
+        } else if (result.burst) {
+          pushBotMessage("Hindi naipadala ang file. Pakisubukan muli.");
         } else {
           setIsTyping(true);
-          setTimeout(() => { pushBotMessage(`May error: ${result.error}`); setIsTyping(false); }, 400);
+          setTimeout(() => { pushBotMessage(`${result.error}`); setIsTyping(false); }, 400);
         }
       } catch {
         setIsTyping(true);
@@ -613,6 +754,8 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
   }
 
   // ── Reset ─────────────────────────────────────────────────────────────
+  // Note: limitDate is intentionally NOT cleared here. The limit is per IP per
+  // PH day, so a new chat would just be rejected again. It expires on its own.
 
   function handleNewChat() {
     setMessages([]);
@@ -636,8 +779,10 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
 
   // ── Derived ───────────────────────────────────────────────────────────
 
-  const currentNode      = getNode(currentNodeKey);
-  const remainingMessages = getRemainingCount();
+  const currentNode = getNode(currentNodeKey);
+
+  const showAfterHoursNotice =
+    stage === "chat" && !hours.open && !ackToday && (liveMode || currentNodeKey === "iba-pa");
 
   // ── Render ────────────────────────────────────────────────────────────
 
@@ -656,7 +801,14 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
             : "opacity-0 invisible translate-y-3 scale-95 pointer-events-none"
         }`}
       >
-        {stage === "chat" && currentNodeKey === "iba-pa" && !liveMode && (
+        {showAfterHoursNotice && (
+          <AfterHoursNotice
+            nextOpenAt={hours.nextOpenAt}
+            onAcknowledge={acknowledgeAfterHours}
+          />
+        )}
+
+        {stage === "chat" && currentNodeKey === "iba-pa" && !liveMode && !limitReached && (hours.open || ackToday) && (
           <HelpdeskCaptchaModal
             verified={!!captchaToken}
             onVerified={setCaptchaToken}
@@ -708,14 +860,12 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
               onQuickReply={handleQuickReply}
             />
 
-            {liveMode && (
-              <div className={`px-4 py-1 text-[11px] text-right border-t border-black/5 ${
-                remainingMessages <= 1 ? "text-red-500" : "text-gray-400"
-              }`}>
-                {remainingMessages === 0
-                  ? "Naabot na ang limitasyon ng mensahe."
-                  : `${remainingMessages} mensahe na lamang.`
-                }
+            {convStatus === "closed" && (
+              <div className="border-t border-black/5 bg-muted/40 px-4 py-2 text-center text-xs">
+                Natapos na ang usapang ito.{" "}
+                <button onClick={handleNewChat} className="font-medium text-blue-700 underline">
+                  Magsimula ng bagong chat
+                </button>
               </div>
             )}
 
@@ -743,7 +893,7 @@ const { validate, validateAttachment, sanitizeInput, error: inputError, clearErr
         onClick={() => { setIsOpen(v => !v); setBubble(true); }}
         aria-label={isOpen ? "Close chat" : "Open city virtual assistant"}
         aria-expanded={isOpen}
-className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-800 border-none cursor-pointer z-[9999] flex items-center justify-center shadow-[0_4px_16px_rgba(8,168,114,0.35),0_2px_4px_rgba(0,0,0,0.1)] transition-transform duration-200 hover:scale-[1.08]"
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-800 border-none cursor-pointer z-[9999] flex items-center justify-center shadow-[0_4px_16px_rgba(8,168,114,0.35),0_2px_4px_rgba(0,0,0,0.1)] transition-transform duration-200 hover:scale-[1.08]"
       >
         {isOpen ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">

@@ -1,4 +1,5 @@
 import type { ClientType, FormState, Lang, Sex } from "./types";
+import { Angry, Ban, Frown, Laugh, Meh, Smile, type LucideIcon } from "lucide-react";
 
 export const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -266,6 +267,26 @@ export const SQD_CANONICAL = [
   "Strongly Agree",
   "Not Applicable",
 ] as const;
+
+// Display order for SQD choices: Strongly Agree → Strongly Disagree, with
+// "Not Applicable" kept last. Rendering only; each option keeps its original
+// value, so stored answers and the PDF mapping are unchanged.
+export const orderSqdOptions = <T>(options: T[]): T[] => [
+  ...options.slice(0, 5).reverse(),
+  ...options.slice(5),
+];
+
+// Icon + selected-state color per SQD option, keyed by the ORIGINAL option
+// index (0 = Strongly Disagree ... 5 = Not Applicable). Keyed by index so it
+// stays correct after reordering and in both languages.
+export const SQD_ICONS: { icon: LucideIcon; tone: string }[] = [
+  { icon: Angry, tone: "text-red-500" },      // 0 Strongly Disagree
+  { icon: Frown, tone: "text-orange-500" },   // 1 Disagree
+  { icon: Meh,   tone: "text-amber-500" },    // 2 Neither
+  { icon: Smile, tone: "text-lime-600" },     // 3 Agree
+  { icon: Laugh, tone: "text-emerald-600" },  // 4 Strongly Agree
+  { icon: Ban,   tone: "text-gray-500" },     // 5 Not Applicable
+];
 
 export const fadeInUp = {
   hidden: { opacity: 0, y: 24 },

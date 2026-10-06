@@ -1,3 +1,5 @@
+//src/components/chat/ChatEnded.tsx
+
 import { JPAvatar } from "./ui/JPAvatar";
 
 const BOT_NAME = "Juana";
