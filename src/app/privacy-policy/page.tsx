@@ -30,7 +30,7 @@ export default function PrivacyPolicy() {
                 className="group block bg-white rounded-2xl shadow-md border border-gray-200 p-8 text-center transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1 hover:border-emerald-300 active:scale-95 active:shadow-md"
               >
                 <img
-                  src="/npc.png"
+                  src="/npc.jpg"
                   alt="National Privacy Commission DPO/DPS Registered Badge"
                   className="mx-auto h-70 w-auto transition-transform duration-300 ease-out group-hover:scale-105"
                 />
