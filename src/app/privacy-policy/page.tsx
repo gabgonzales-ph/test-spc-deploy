@@ -10,7 +10,7 @@ export default function PrivacyPolicy() {
             <Shield className="mx-auto h-16 w-16 text-white mb-6" />
             <h1 className="text-4xl font-bold text-white mb-4">Privacy Policy</h1>
             <p className="text-xl text-emerald-100 max-w-2xl mx-auto">
-              City Government of San Pablo, Laguna - Protecting Your Personal Information
+              City Government of San Pablo - Protecting Your Personal Information
             </p>
           </div>
         </div>
@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
               <div className="flex items-center">
                 <AlertCircle className="h-5 w-5 text-emerald-600 mr-2" />
                 <p className="text-sm text-emerald-800">
-                  <strong>Last Updated:</strong> September 17, 2025
+                  <strong>Last Updated:</strong> October 01, 2026
                 </p>
               </div>
             </div>
@@ -63,7 +63,7 @@ export default function PrivacyPolicy() {
                 Introduction
               </h2>
               <p className="text-gray-700 mb-4">
-                The City Government of San Pablo, Laguna (&quot;San Pablo City&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) is committed to protecting your privacy and personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our official website (sanpablocity.gov.ph) and use our digital services.
+                The City Government of San Pablo (&quot;San Pablo City&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) is committed to protecting your privacy and personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our official website (sanpablocity.gov.ph) and use our digital services.
               </p>
               <p className="text-gray-700">
                 As a Local Government Unit (LGU) of the Republic of the Philippines, we adhere to the Data Privacy Act of 2012 (RA 10173), its Implementing Rules and Regulations (IRR), and guidelines issued by the National Privacy Commission (NPC) and the Department of Information and Communications Technology (DICT).
@@ -250,7 +250,7 @@ export default function PrivacyPolicy() {
               <div className="bg-emerald-50 p-6 rounded-lg">
                 <h3 className="text-lg font-semibold text-emerald-800 mb-3">Data Protection Officer</h3>
                 <div className="space-y-2 text-emerald-700">
-                  <p><strong>Office:</strong> City Government of San Pablo, Laguna</p>
+                  <p><strong>Office:</strong> City Government of San Pablo</p>
                   <p><strong>Address:</strong> City Hall, San Pablo City, Laguna</p>
                   <p><strong>Email:</strong> dpo@sanpablocity.gov.ph</p>
                   <p><strong>Phone:</strong> (049) 562-3156</p>
