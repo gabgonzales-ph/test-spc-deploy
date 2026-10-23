@@ -250,8 +250,9 @@ export function CSMBody({ csm }: Props) {
                 placeholder={t.commentsPlaceholder}
                 className={`${inputClass} resize-none`}
               />
-              <p className="mt-1 text-[12px] text-gray-400">{form.comments.length}/1000</p>
-            </div>
+            <p className="text-[12px] text-gray-400">{t.commentsNotice}</p>
+  <p className="text-[12px] text-gray-400 shrink-0">Comment length: {form.comments.length}/1000</p>
+</div>
 
             <div ref={registerField("emailAddress")}>
               <label className="block text-[13px] font-medium text-gray-700 mb-1.5">

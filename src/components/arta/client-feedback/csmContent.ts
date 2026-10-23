@@ -77,6 +77,7 @@ export const CONTENT: Record<
     sqdOptions: string[];
     commentsLabel: string;
     commentsPlaceholder: string;
+    commentsNotice: string;
     emailLabel: string;
     emailPlaceholder: string;
     backBtn: string;
@@ -150,6 +151,8 @@ export const CONTENT: Record<
     sqdOptions: ["Strongly Disagree", "Disagree", "Neither Agree nor Disagree", "Agree", "Strongly Agree", "Not Applicable"],
     commentsLabel: "Suggestions on how we can further improve our services",
     commentsPlaceholder: "Tell us how we can do better...",
+    commentsNotice: "Please do not include names or contact details (email, phone number) in your comment.",
+
     emailLabel: "Email address",
     emailPlaceholder: "juan@email.com",
     backBtn: "Back",
@@ -230,6 +233,7 @@ export const CONTENT: Record<
     ],
     commentsLabel: "Mungkahi kung paano pa namin mapapahusay ang aming serbisyo",
     commentsPlaceholder: "Sabihin sa amin kung paano kami makakapagpabuti...",
+    commentsNotice: "Huwag po maglagay ng pangalan o contact details (email, numero ng telepono) sa inyong komento.",
     emailLabel: "Email address",
     emailPlaceholder: "juan@email.com",
     backBtn: "Bumalik",

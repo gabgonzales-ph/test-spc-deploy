@@ -21,7 +21,7 @@ import {
   generateCsmPdf,
   generateCalibrationPdf,
   type CsmResponseForPdf,
-} from "../src/backend/utils/csmPdfService";
+} from "../src/backend/utils/csm/csmPdfService";
 
 const mockResponse: CsmResponseForPdf = {
   control_no: "2026-08-0123",

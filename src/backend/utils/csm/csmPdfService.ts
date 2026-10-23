@@ -1,5 +1,5 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
-import { supabase } from "../config/database"; // adjust import to your actual supabase client export
+import { supabase } from "@/backend/config/database";
 import {
   CHECKBOXES_TAGALOG,
   OFFICE_NAME_FIELD_TAGALOG,
