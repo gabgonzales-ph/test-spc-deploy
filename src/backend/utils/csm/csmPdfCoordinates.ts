@@ -2,6 +2,7 @@
  * Coordinate map for the CSM (Client Satisfaction Measurement) PDF templates.
  *
  * Source templates: Supabase Storage bucket "documents", path "forms/csm/<template file>"
+ * (csm-tl-v2.pdf, csm-en-v2.pdf)
  * Origin note: all coordinates below are TOP-based (distance from top of page, in points),
  * matching how they were measured off the template. Convert to pdf-lib's bottom-left
  * origin at draw time with `topToPdfY()` in csmPdfService.ts.
@@ -32,102 +33,6 @@ export interface TextFieldSpec {
    * Defaults to 1.15 in csmPdfService.ts if omitted. Only relevant when multiline. */
   lineHeightRatio?: number;
 }
-
-/* ============================================================================
- * ENGLISH TEMPLATE (csmform.pdf, 612 x 936) — LEGACY, NOT USED YET.
- * To be replaced by a v2 English template (same layout as the Tagalog v2,
- * with Client Name / Contact No. fields) in a later pass.
- * ==========================================================================*/
-
-/** Checkbox center points, keyed by field group -> option value. */
-export const CHECKBOXES = {
-  clientType: {
-    citizen: { x: 95.9, y: 150 } as Point,
-    business: { x: 143.0, y: 150 } as Point,
-    government: { x: 198.2, y: 150 } as Point,
-  },
-  sex: {
-    male: { x: 206.8, y: 172 } as Point,
-    female: { x: 245.6, y: 172 } as Point,
-  },
-  cc1: {
-    1: { x: 82, y: 300.45 } as Point,
-    2: { x: 82, y: 313.0 } as Point,
-    3: { x: 82, y: 326.7 } as Point,
-    4: { x: 82, y: 338.55 } as Point,
-  },
-  cc2: {
-    1: { x: 82, y: 372.7 } as Point,
-    2: { x: 82, y: 386.85 } as Point,
-    3: { x: 82, y: 396.65 } as Point,
-    4: { x: 253.9, y: 373.15 } as Point,
-    5: { x: 253.9, y: 386.15 } as Point, // N/A
-  },
-  cc3: {
-    1: { x: 82, y: 432.0 } as Point,
-    2: { x: 82, y: 444.6 } as Point,
-    3: { x: 216.9, y: 434.15 } as Point,
-    4: { x: 217.8, y: 443.7 } as Point, // N/A
-  },
-} as const;
-
-/** SQD table: 6 answer columns (center-x) x 9 rows (center-y), in points. */
-export const SQD_COLUMN_X = {
-  "Strongly Disagree": 273.25,
-  Disagree: 325.25,
-  "Neither Agree nor Disagree": 385.5,
-  Agree: 439.5,
-  "Strongly Agree": 483.65,
-  "Not Applicable": 531.9,
-} as const;
-
-export const SQD_ROW_Y: Record<
-  "sqd0" | "sqd1" | "sqd2" | "sqd3" | "sqd4" | "sqd5" | "sqd6" | "sqd7" | "sqd8",
-  number
-> = {
-  sqd0: 544.75,
-  sqd1: 571.9,
-  sqd2: 602.65,
-  sqd3: 632.85,
-  sqd4: 657.5,
-  sqd5: 685.5,
-  sqd6: 713.5,
-  sqd7: 742.3,
-  sqd8: 776.65,
-};
-
-/** Free-text field placements. */
-export const TEXT_FIELDS: Record<string, TextFieldSpec> = {
-  controlNo: { x: 87, top: 16, maxWidth: 60, maxFontSize: 11, minFontSize: 6 },
-  date: { x: 68, top: 163.9, maxWidth: 100, maxFontSize: 11, minFontSize: 6 },
-  age: { x: 350, top: 165.9, maxWidth: 35, maxFontSize: 11, minFontSize: 6 },
-  region: { x: 135, top: 185.5, maxWidth: 100, maxFontSize: 11, minFontSize: 6 },
-  service: { x: 333, top: 185.5, maxWidth: 200, maxFontSize: 11, minFontSize: 6 },
-  email: { x: 155, top: 870.1, maxWidth: 245, maxFontSize: 11, minFontSize: 6 },
-  comments: {
-    x: 31,
-    top: 825,
-    maxWidth: 545,
-    maxHeight: 45,
-    maxFontSize: 11,
-    minFontSize: 6,
-    multiline: true,
-    lineHeightRatio: 2,
-  },
-};
-
-/**
- * Office name placeholder area (English template) — drawn horizontally centered
- * within [boxLeft, boxRight] by csmPdfService.ts.
- */
-export const OFFICE_NAME_FIELD = {
-  boxLeft: 195.6,
-  boxRight: 419.6,
-  top: 42,
-  maxWidth: 524,
-  maxFontSize: 22,
-  minFontSize: 22,
-} as const;
 
 /* ============================================================================
  * TAGALOG TEMPLATE v2 — 1 PAGE (csm-tl-v2.pdf)
@@ -166,6 +71,16 @@ export interface PagedPoint extends Point {
 
 /** Same shape as TextFieldSpec, plus a page index. */
 export interface PagedTextFieldSpec extends TextFieldSpec {
+  page: number;
+}
+
+/** Single-line field drawn at one fixed font size (no shrink-to-fit, no width
+ * limit). For fields with plenty of room, e.g. the control number. `top` is the
+ * baseline, same as single-line PagedTextFieldSpec. */
+export interface PagedFixedFieldSpec {
+  x: number;
+  top: number;
+  fontSize: number;
   page: number;
 }
 
@@ -243,8 +158,11 @@ export const SQD_ROW_Y_TAGALOG: Record<
  *   service 303–465 @201.3 · comment lines 36–476.5 @914.8 and @933.1 ·
  *   client name 169–301 @950.9 · contact no. 440–562 @950.9 · email 143–477 @969.4
  */
-export const TEXT_FIELDS_TAGALOG: Record<string, PagedTextFieldSpec | PagedTextFieldSpec[]> = {
-  controlNo: [{ x: 86, top: 24, maxWidth: 60, maxFontSize: 14, minFontSize: 6, page: 0 }],
+export const TEXT_FIELDS_TAGALOG: Record<
+  string,
+  PagedTextFieldSpec | PagedTextFieldSpec[] | PagedFixedFieldSpec | PagedFixedFieldSpec[]
+> = {
+  controlNo: [{ x: 90, top: 24, fontSize: 10, page: 0 }],
   date: { x: 64, top: 181.7, maxWidth: 55, maxFontSize: 10, minFontSize: 6, page: 0 },
   age: { x: 396, top: 181.7, maxWidth: 45, maxFontSize: 10, minFontSize: 6, page: 0 },
   region: { x: 74, top: 200.6, maxWidth: 95, maxFontSize: 10, minFontSize: 6, page: 0 },
@@ -299,5 +217,152 @@ export const OFFICE_NAME_FIELD_TAGALOG = {
   minFontSize: 8,
   wrappedTop: 54.5,
   lineHeight: 10,
+  maxLines: 2,
+} as const;
+
+/* ============================================================================
+ * ENGLISH TEMPLATE v2 — 1 PAGE (csm-en-v2.pdf)
+ *
+ * Source template: Supabase Storage bucket "documents", path
+ * "forms/csm/csm-en-v2.pdf" (the "Online Version" of the ARTA form).
+ * Replaces the legacy csmform.pdf map.
+ *
+ * Page size: 612 x 936pt, single page.
+ *
+ * Derived the same way as the Tagalog v2 map: text layer (word boxes) and
+ * vector geometry (table gridlines, underlines), with checkbox centers
+ * cross-checked against a 288-dpi raster (glyph centers within 0.4pt of the
+ * pixel centers; the pixel values are used below). Not yet eyeballed on a
+ * production render.
+ *
+ * Layout notes vs the Tagalog template:
+ *  - Same field set (incl. Client Name / Contact No.), different positions.
+ *  - Page is 936pt tall, so the bottom block is higher up.
+ *  - SQD table columns are NOT evenly spaced (the Neither column is wider).
+ *  - The ARTA approval box is at x=444–586, top=11–67. "(Online Version)"
+ *    is printed at the left, x=37, top=40–48.
+ *  - Header "CITY GOVERNMENT OF SAN PABLO" spans x=158.7–439.5, top=36.2–52.2
+ *    (center x≈299.1); the next printed line ("HELP US SERVE YOU BETTER!")
+ *    starts at top=82, leaving ~30pt for the office name.
+ *
+ * Underlines (x range @ y): date 57–133 @165.2 · age 343–393 @165.2 ·
+ * region 112–220 @184.4 · service 312–530 @184.4 · comment lines 36–574.5
+ * @793.2 and @814.9 · client name 127–271 @831.6 · contact no. 390–499 @831.6
+ * · email 126.5–441 @848.8. Single-line `top` values are baselines just above
+ * these; the comments `top` is a box top (see the Tagalog notes).
+ * ==========================================================================*/
+
+export const TEMPLATE_PATH_ENGLISH = "forms/csm/csm-en-v2.pdf";
+export const PAGE_WIDTH_ENGLISH = 612;
+export const PAGE_HEIGHT_ENGLISH = 936;
+export const PAGE_COUNT_ENGLISH = 1;
+
+export const CHECKBOXES_ENGLISH = {
+  clientType: {
+    citizen: { x: 81.3, y: 142.0, page: 0 } as PagedPoint,
+    business: { x: 122.7, y: 142.0, page: 0 } as PagedPoint,
+    government: { x: 171.9, y: 142.0, page: 0 } as PagedPoint,
+  },
+  sex: {
+    male: { x: 202.0, y: 161.2, page: 0 } as PagedPoint,
+    female: { x: 236.7, y: 161.2, page: 0 } as PagedPoint,
+  },
+  cc1: {
+    1: { x: 85.4, y: 270.5, page: 0 } as PagedPoint,
+    2: { x: 85.4, y: 282.5, page: 0 } as PagedPoint,
+    3: { x: 85.9, y: 294.3, page: 0 } as PagedPoint,
+    4: { x: 85.4, y: 306.1, page: 0 } as PagedPoint,
+  },
+  cc2: {
+    1: { x: 85.4, y: 335.9, page: 0 } as PagedPoint,
+    2: { x: 85.9, y: 348.3, page: 0 } as PagedPoint,
+    3: { x: 85.9, y: 360.9, page: 0 } as PagedPoint,
+    4: { x: 256.0, y: 336.3, page: 0 } as PagedPoint,
+    5: { x: 256.0, y: 348.4, page: 0 } as PagedPoint, // N/A
+  },
+  cc3: {
+    1: { x: 85.9, y: 390.7, page: 0 } as PagedPoint,
+    2: { x: 85.9, y: 403.3, page: 0 } as PagedPoint,
+    3: { x: 220.0, y: 391.1, page: 0 } as PagedPoint,
+    4: { x: 220.0, y: 403.5, page: 0 } as PagedPoint, // N/A
+  },
+} as const;
+
+/** SQD table: 6 answer columns (center-x). Midpoints of the vertical gridlines
+ * at x = 251.9, 302.9, 355.5, 422.9, 462.9, 511.0, 558.8. */
+export const SQD_COLUMN_X_ENGLISH = {
+  "Strongly Disagree": 277.4,
+  Disagree: 329.2,
+  "Neither Agree nor Disagree": 389.2,
+  Agree: 442.9,
+  "Strongly Agree": 487.0,
+  "Not Applicable": 534.9,
+} as const;
+
+/** SQD row centers (center-y). Midpoints between horizontal gridlines at
+ * 486.3, 513.1, 539.9, 574.9, 601.7, 625.2, 658.5, 682.2, 717.2, 752.0. */
+export const SQD_ROW_Y_ENGLISH: Record<
+  "sqd0" | "sqd1" | "sqd2" | "sqd3" | "sqd4" | "sqd5" | "sqd6" | "sqd7" | "sqd8",
+  { y: number; page: number }
+> = {
+  sqd0: { y: 500.2, page: 0 },
+  sqd1: { y: 527.0, page: 0 },
+  sqd2: { y: 557.9, page: 0 },
+  sqd3: { y: 588.8, page: 0 },
+  sqd4: { y: 614.0, page: 0 },
+  sqd5: { y: 642.4, page: 0 },
+  sqd6: { y: 670.9, page: 0 },
+  sqd7: { y: 700.2, page: 0 },
+  sqd8: { y: 735.1, page: 0 },
+};
+
+export const TEXT_FIELDS_ENGLISH: Record<
+  string,
+  PagedTextFieldSpec | PagedTextFieldSpec[] | PagedFixedFieldSpec | PagedFixedFieldSpec[]
+> = {
+  // "Control No:" label ends at x=86.8, bottom=25.7.
+  controlNo: [{ x: 91, top: 24, fontSize: 10, page: 0 }],
+  date: { x: 60, top: 164.5, maxWidth: 70, maxFontSize: 9, minFontSize: 6, page: 0 },
+  age: { x: 345, top: 164.5, maxWidth: 45, maxFontSize: 9, minFontSize: 6, page: 0 },
+  // The "Service Availed:" label starts at x=252, so region may run to ~x=248.
+  region: { x: 114, top: 183.7, maxWidth: 130, maxFontSize: 9, minFontSize: 6, page: 0 },
+  service: { x: 314, top: 183.7, maxWidth: 258, maxFontSize: 8, minFontSize: 6, page: 0 },
+  comments: {
+    // Two ruled lines, 21.7pt apart: first baseline just above y=793.2
+    // (= top + size = 782.4 + 10), second just above y=814.9.
+    x: 36,
+    top: 782.4,
+    maxWidth: 538,
+    maxHeight: 44,
+    maxFontSize: 10,
+    minFontSize: 6,
+    multiline: true,
+    lineHeightRatio: 2.17,
+    page: 0,
+  },
+  clientName: { x: 129, top: 830.9, maxWidth: 140, maxFontSize: 9, minFontSize: 6, page: 0 },
+  contactNo: { x: 393, top: 830.9, maxWidth: 104, maxFontSize: 9, minFontSize: 6, page: 0 },
+  email: { x: 129, top: 848.1, maxWidth: 308, maxFontSize: 9, minFontSize: 6, page: 0 },
+};
+
+/**
+ * Office name — centered under the printed header (center x≈299.1), in smaller
+ * italic text; same layout rules as OFFICE_NAME_FIELD_TAGALOG. The range is
+ * symmetric around the header's center and stops at x=438.2 so a long name can
+ * never run into the ARTA box (starts x=444.4, bottom 67). The gap to the next
+ * printed line (top 82) is ~30pt.
+ */
+export const OFFICE_NAME_FIELD_ENGLISH = {
+  page: 0,
+  boxLeft: 160,
+  boxRight: 438.2,
+  top: 57,
+  maxWidth: 278.2, // boxRight - boxLeft
+  maxFontSize: 11,
+  minSingleLineFontSize: 9,
+  wrapFontSize: 9,
+  minFontSize: 8,
+  wrappedTop: 55,
+  lineHeight: 11,
   maxLines: 2,
 } as const;

@@ -7,7 +7,9 @@
  * Usage (from the project root):
  *   bun run scripts/test-csm-pdf.ts                     # download template from Supabase (needs .env)
  *   bun run scripts/test-csm-pdf.ts --local=./CSM-ONLINE-TAGALOGv2.pdf   # use a local template file, no Supabase
- *   bun run scripts/test-csm-pdf.ts --lang=en           # language to request (default: tl)
+ *   bun run scripts/test-csm-pdf.ts --lang=en --local=./CSM-ONLINE-ENGLISHv2.pdf
+ *   bun run scripts/test-csm-pdf.ts --lang=all --local-tl=<tl.pdf> --local-en=<en.pdf>
+ *   bun run scripts/test-csm-pdf.ts --lang=en           # language to test: tl (default), en or all
  *   bun run scripts/test-csm-pdf.ts --only=long-name    # run a single scenario by name
  *   bun run scripts/test-csm-pdf.ts --calibration       # also write a calibration PDF (Supabase mode only)
  *
@@ -17,6 +19,7 @@ import { PDFDocument } from "pdf-lib";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  type CsmPdfLang,
   fillCsmPdf,
   generateCalibrationPdf,
   generateCsmPdf,
@@ -32,8 +35,11 @@ const getArg = (name: string): string | undefined =>
   args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
 const hasFlag = (name: string) => args.includes(`--${name}`);
 
-const localTemplate = getArg("local");
-const lang = resolvePdfLang(getArg("lang") ?? "tl");
+const langArg = getArg("lang") ?? "tl";
+const langs: CsmPdfLang[] = langArg === "all" ? ["tl", "en"] : [resolvePdfLang(langArg)];
+// --local applies when a single language is tested; use --local-tl / --local-en with --lang=all.
+const localFor = (l: CsmPdfLang): string | undefined =>
+  getArg(`local-${l}`) ?? (langs.length === 1 ? getArg("local") : undefined);
 const only = getArg("only");
 const OUT_DIR = path.resolve(process.cwd(), "csm-test-output");
 
@@ -118,12 +124,20 @@ const SCENARIOS: { name: string; note: string; row: CsmResponseForPdf }[] = [
     },
   },
   {
+    name: "wrapped-office-name",
+    note: "Office name too long for one line -> wraps onto 2 centered lines",
+    row: {
+      ...BASE,
+      office_name: "City Environmental and Natural Resources Office - Solid Waste Management Division",
+    },
+  },
+  {
     name: "very-long-office-name",
-    note: "Office name longer than the slot -> shrinks to 8pt, then ellipsis",
+    note: "Office name longer than 2 lines -> shrinks to 8pt, last line ellipsized",
     row: {
       ...BASE,
       office_name:
-        "City Environmental and Natural Resources Office - Solid Waste Management and Coastal Resource Division Annex",
+        "City Environmental and Natural Resources Office - Solid Waste Management and Coastal Resource Division Annex for Special Projects and Inter-Agency Coordination",
     },
   },
   {
@@ -179,9 +193,10 @@ const SCENARIOS: { name: string; note: string; row: CsmResponseForPdf }[] = [
 // ---------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------
-async function render(row: CsmResponseForPdf): Promise<Uint8Array> {
-  if (localTemplate) {
-    const templateBytes = readFileSync(path.resolve(localTemplate));
+async function render(row: CsmResponseForPdf, lang: CsmPdfLang): Promise<Uint8Array> {
+  const local = localFor(lang);
+  if (local) {
+    const templateBytes = readFileSync(path.resolve(local));
     const doc = await PDFDocument.load(templateBytes);
     return fillCsmPdf(doc, row, lang);
   }
@@ -204,52 +219,62 @@ async function check(bytes: Uint8Array): Promise<string[]> {
 
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
-  console.log(
-    `CSM PDF test | lang=${lang} | template=${localTemplate ? `local:${localTemplate}` : "Supabase"} | out=${OUT_DIR}\n`
-  );
 
   const selected = only ? SCENARIOS.filter((s) => s.name === only) : SCENARIOS;
   if (selected.length === 0) {
     console.error(`No scenario named "${only}". Available: ${SCENARIOS.map((s) => s.name).join(", ")}`);
     process.exit(1);
   }
-
-  let failed = 0;
-  for (const s of selected) {
-    const file = path.join(OUT_DIR, `csm-${lang}-${s.name}.pdf`);
-    try {
-      const bytes = await render(s.row);
-      writeFileSync(file, bytes);
-      const problems = await check(bytes);
-      if (problems.length) {
-        failed++;
-        console.log(`FAIL  ${s.name}  (${problems.join("; ")})`);
-      } else {
-        console.log(`ok    ${s.name}  ${(bytes.length / 1024).toFixed(0)} KB  - ${s.note}`);
-      }
-    } catch (e) {
-      failed++;
-      console.log(`FAIL  ${s.name}  threw: ${e instanceof Error ? e.message : String(e)}`);
-    }
+  if (langs.length > 1 && getArg("local")) {
+    console.error("With --lang=all use --local-tl=<file> and --local-en=<file> (not --local).");
+    process.exit(1);
   }
 
-  if (hasFlag("calibration")) {
-    if (localTemplate) {
-      console.log("\nskip  calibration (needs Supabase; run without --local)");
-    } else {
+  let failed = 0;
+  let total = 0;
+  for (const lang of langs) {
+    const local = localFor(lang);
+    console.log(
+      `\nCSM PDF test | lang=${lang} | template=${local ? `local:${local}` : "Supabase"} | out=${OUT_DIR}\n`
+    );
+
+    for (const s of selected) {
+      total++;
+      const file = path.join(OUT_DIR, `csm-${lang}-${s.name}.pdf`);
       try {
-        const file = path.join(OUT_DIR, `csm-${lang}-calibration.pdf`);
-        writeFileSync(file, await generateCalibrationPdf(lang));
-        console.log(`\nok    calibration -> ${file}`);
+        const bytes = await render(s.row, lang);
+        writeFileSync(file, bytes);
+        const problems = await check(bytes);
+        if (problems.length) {
+          failed++;
+          console.log(`FAIL  ${s.name}  (${problems.join("; ")})`);
+        } else {
+          console.log(`ok    ${s.name}  ${(bytes.length / 1024).toFixed(0)} KB  - ${s.note}`);
+        }
       } catch (e) {
         failed++;
-        console.log(`\nFAIL  calibration  threw: ${e instanceof Error ? e.message : String(e)}`);
+        console.log(`FAIL  ${s.name}  threw: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    if (hasFlag("calibration")) {
+      if (local) {
+        console.log("\nskip  calibration (needs Supabase; run without --local)");
+      } else {
+        try {
+          const file = path.join(OUT_DIR, `csm-${lang}-calibration.pdf`);
+          writeFileSync(file, await generateCalibrationPdf(lang));
+          console.log(`\nok    calibration -> ${file}`);
+        } catch (e) {
+          failed++;
+          console.log(`\nFAIL  calibration  threw: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
     }
   }
 
   console.log(
-    `\n${selected.length - failed}/${selected.length} scenarios passed. Open the PDFs in ${OUT_DIR} to check placement by eye.`
+    `\n${total - failed}/${total} scenarios passed. Open the PDFs in ${OUT_DIR} to check placement by eye.`
   );
   process.exit(failed ? 1 : 0);
 }

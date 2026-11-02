@@ -1,14 +1,22 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 import { supabase } from "@/backend/config/database";
 import {
+  CHECKBOXES_ENGLISH,
   CHECKBOXES_TAGALOG,
+  OFFICE_NAME_FIELD_ENGLISH,
   OFFICE_NAME_FIELD_TAGALOG,
+  PAGE_HEIGHT_ENGLISH,
   PAGE_HEIGHT_TAGALOG,
+  PagedFixedFieldSpec,
   PagedPoint,
   PagedTextFieldSpec,
+  SQD_COLUMN_X_ENGLISH,
   SQD_COLUMN_X_TAGALOG,
+  SQD_ROW_Y_ENGLISH,
   SQD_ROW_Y_TAGALOG,
+  TEMPLATE_PATH_ENGLISH,
   TEMPLATE_PATH_TAGALOG,
+  TEXT_FIELDS_ENGLISH,
   TEXT_FIELDS_TAGALOG,
 } from "./csmPdfCoordinates";
 
@@ -56,7 +64,10 @@ interface PdfTemplateConfig {
   };
   sqdColumnX: Record<string, number>;
   sqdRowY: Record<SqdKey, { y: number; page: number }>;
-  textFields: Record<string, PagedTextFieldSpec | PagedTextFieldSpec[]>;
+  textFields: Record<
+    string,
+    PagedTextFieldSpec | PagedTextFieldSpec[] | PagedFixedFieldSpec | PagedFixedFieldSpec[]
+  >;
   officeName: OfficeNameSpec;
 }
 
@@ -70,15 +81,19 @@ const TAGALOG_TEMPLATE: PdfTemplateConfig = {
   officeName: OFFICE_NAME_FIELD_TAGALOG,
 };
 
-/**
- * TODO(english-v2): the English template has not been migrated yet. Until its
- * template file + coordinate map exist, "en" falls back to the Tagalog template
- * so an English respondent still gets a PDF. Replace this entry with a real
- * English config (own templatePath, pageHeight and coordinates) when ready.
- */
+const ENGLISH_TEMPLATE: PdfTemplateConfig = {
+  templatePath: TEMPLATE_PATH_ENGLISH,
+  pageHeight: PAGE_HEIGHT_ENGLISH,
+  checkboxes: CHECKBOXES_ENGLISH,
+  sqdColumnX: SQD_COLUMN_X_ENGLISH,
+  sqdRowY: SQD_ROW_Y_ENGLISH,
+  textFields: TEXT_FIELDS_ENGLISH,
+  officeName: OFFICE_NAME_FIELD_ENGLISH,
+};
+
 const TEMPLATES: Record<CsmPdfLang, PdfTemplateConfig> = {
   tl: TAGALOG_TEMPLATE,
-  en: TAGALOG_TEMPLATE,
+  en: ENGLISH_TEMPLATE,
 };
 
 export function resolvePdfLang(value: unknown): CsmPdfLang {
@@ -260,6 +275,26 @@ function drawSingleLineField(
     // whether it renders at maxFontSize or has shrunk to fit.
     y: topToPdfY(cfg, spec.top),
     size,
+    font,
+    color: TEXT_COLOR,
+  });
+}
+
+/** Draws single-line text at a fixed font size: no fitting, no truncation. */
+function drawFixedField(
+  pdfDoc: PDFDocument,
+  cfg: PdfTemplateConfig,
+  font: PDFFont,
+  spec: PagedFixedFieldSpec,
+  value: string | number | null | undefined
+) {
+  if (value === null || value === undefined || value === "") return;
+  const clean = toEncodable(font, String(value));
+  if (!clean) return;
+  getPage(pdfDoc, spec.page).drawText(clean, {
+    x: spec.x,
+    y: topToPdfY(cfg, spec.top),
+    size: spec.fontSize,
     font,
     color: TEXT_COLOR,
   });
@@ -461,10 +496,10 @@ export async function fillCsmPdf(
   const tf = cfg.textFields;
 
   // --- Text fields ---
-  const controlNoSpecs = Array.isArray(tf.controlNo) ? tf.controlNo : [tf.controlNo];
-  controlNoSpecs.forEach((spec) =>
-    drawSingleLineField(pdfDoc, cfg, font, spec, response.control_no)
-  );
+  const controlNoSpecs = (
+    Array.isArray(tf.controlNo) ? tf.controlNo : [tf.controlNo]
+  ) as PagedFixedFieldSpec[];
+  controlNoSpecs.forEach((spec) => drawFixedField(pdfDoc, cfg, font, spec, response.control_no));
 
   // Office name: smaller italic text under the printed "CITY GOVERNMENT OF SAN PABLO" (wraps to 2 lines if long).
   drawOfficeName(pdfDoc, cfg, fonts.italic, cfg.officeName, response.office_name);
@@ -494,8 +529,7 @@ export async function fillCsmPdf(
  * overlaid PDF bytes for a single response row.
  *
  * `lang` is the language the respondent chose on the form. It is used only to
- * pick the template; it is not stored. English currently falls back to the
- * Tagalog template (see TEMPLATES).
+ * pick the template (csm-en-v2.pdf or csm-tl-v2.pdf); it is not stored.
  */
 export async function generateCsmPdf(
   response: CsmResponseForPdf,
