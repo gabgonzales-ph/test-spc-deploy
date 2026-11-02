@@ -1,3 +1,5 @@
+
+import { isValidContactNo } from '@/lib/csm/csmContact'
 import { z } from 'zod'
 
 // SQD0-SQD8 ratings, stored as the literal phrase (not a numeric code).
@@ -11,6 +13,7 @@ const sqdRating = z.enum([
 ])
 
 export const CsmResponseSchema = z.object({
+  language: z.enum(['en', 'tl']).optional(),
   officeId:         z.string().uuid({ message: 'An office must be selected' }),
   clientType:       z.enum(['citizen', 'business', 'government']),
   transactionDate:  z.string().min(1, 'Date is required'), // ISO date string, e.g. 2026-08-04
@@ -38,6 +41,12 @@ export const CsmResponseSchema = z.object({
 
   comments:     z.string().max(1000).optional().or(z.literal('')),
   emailAddress: z.string().email().max(100).optional().or(z.literal('')),
+  clientName: z.string().max(200).optional(),
+contactNo:  z
+  .string()
+  .max(50)
+  .refine((v) => v.trim() === '' || isValidContactNo(v.trim()), 'Invalid contact number')
+  .optional(),
 })
 
 export type CsmResponseInput = z.infer<typeof CsmResponseSchema>

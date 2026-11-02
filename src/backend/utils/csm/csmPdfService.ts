@@ -4,26 +4,86 @@ import {
   CHECKBOXES_TAGALOG,
   OFFICE_NAME_FIELD_TAGALOG,
   PAGE_HEIGHT_TAGALOG,
+  PagedPoint,
   PagedTextFieldSpec,
   SQD_COLUMN_X_TAGALOG,
   SQD_ROW_Y_TAGALOG,
+  TEMPLATE_PATH_TAGALOG,
   TEXT_FIELDS_TAGALOG,
 } from "./csmPdfCoordinates";
 
 const TEMPLATE_BUCKET = "documents";
-// TEMPORARY: using the Tagalog template for all generation regardless of any
-// language preference on the response. Swap back to csmform.pdf (English,
-// single page) + the non-`_TAGALOG` coordinate exports once EN/TL selection
-// is wired up properly.
-// Template updated to the single-page Tagalog form — replaces the old
-// 2-page csmform_tagalog.pdf. Page-indexed helpers below (getPage, the
-// controlNo specs array, PagedPoint/page fields in csmPdfCoordinates.ts)
-// are kept as-is (all `page: 0`) even though there's only one page now,
-// per team decision to preserve the paged shape for future templates.
-const TEMPLATE_PATH = "forms/csm/csm_onepage.pdf";
 
 const TEXT_COLOR = rgb(0, 0, 0);
 const LINE_HEIGHT_RATIO = 1.15;
+
+// ---------------------------------------------------------------------
+// Per-language template config
+// ---------------------------------------------------------------------
+export type CsmPdfLang = "en" | "tl";
+
+type SqdKey = "sqd0" | "sqd1" | "sqd2" | "sqd3" | "sqd4" | "sqd5" | "sqd6" | "sqd7" | "sqd8";
+
+interface OfficeNameSpec {
+  page: number;
+  boxLeft: number;
+  boxRight: number;
+  top: number;
+  maxWidth: number;
+  maxFontSize: number;
+  /** Smallest size to try on a single line before wrapping. */
+  minSingleLineFontSize: number;
+  /** Starting size when the name has to wrap. */
+  wrapFontSize: number;
+  /** Floor for the wrapped layout. */
+  minFontSize: number;
+  /** Top of the first line when wrapped (raised so 2 lines fit the slot). */
+  wrappedTop: number;
+  lineHeight: number;
+  maxLines: number;
+}
+
+interface PdfTemplateConfig {
+  templatePath: string;
+  /** Page height in points; used to convert top-based y to pdf-lib's bottom-left origin. */
+  pageHeight: number;
+  checkboxes: {
+    clientType: Record<string, PagedPoint>;
+    sex: Record<string, PagedPoint>;
+    cc1: Record<number, PagedPoint>;
+    cc2: Record<number, PagedPoint>;
+    cc3: Record<number, PagedPoint>;
+  };
+  sqdColumnX: Record<string, number>;
+  sqdRowY: Record<SqdKey, { y: number; page: number }>;
+  textFields: Record<string, PagedTextFieldSpec | PagedTextFieldSpec[]>;
+  officeName: OfficeNameSpec;
+}
+
+const TAGALOG_TEMPLATE: PdfTemplateConfig = {
+  templatePath: TEMPLATE_PATH_TAGALOG,
+  pageHeight: PAGE_HEIGHT_TAGALOG,
+  checkboxes: CHECKBOXES_TAGALOG,
+  sqdColumnX: SQD_COLUMN_X_TAGALOG,
+  sqdRowY: SQD_ROW_Y_TAGALOG,
+  textFields: TEXT_FIELDS_TAGALOG,
+  officeName: OFFICE_NAME_FIELD_TAGALOG,
+};
+
+/**
+ * TODO(english-v2): the English template has not been migrated yet. Until its
+ * template file + coordinate map exist, "en" falls back to the Tagalog template
+ * so an English respondent still gets a PDF. Replace this entry with a real
+ * English config (own templatePath, pageHeight and coordinates) when ready.
+ */
+const TEMPLATES: Record<CsmPdfLang, PdfTemplateConfig> = {
+  tl: TAGALOG_TEMPLATE,
+  en: TAGALOG_TEMPLATE,
+};
+
+export function resolvePdfLang(value: unknown): CsmPdfLang {
+  return value === "en" || value === "tl" ? value : "tl";
+}
 
 export interface CsmResponseForPdf {
   control_no: string;
@@ -47,20 +107,45 @@ export interface CsmResponseForPdf {
   sqd8: string;
   comments?: string | null;
   email_address?: string | null;
+  client_name?: string | null;
+  contact_no?: string | null;
   /** Denormalized office name (csm_response.office_name), used only for the
-   * header placeholder — not required for the row to otherwise be valid. */
+   * header — not required for the row to otherwise be valid. */
   office_name?: string | null;
 }
 
-/** Convert a top-based y (distance from top of page) to pdf-lib's bottom-left origin.
- * Uses the Tagalog page height (1008pt) — the single-page template's page height. */
-function topToPdfY(top: number): number {
-  return PAGE_HEIGHT_TAGALOG - top;
+interface Fonts {
+  regular: PDFFont;
+  italic: PDFFont;
+}
+
+/** Convert a top-based y (distance from top of page) to pdf-lib's bottom-left origin. */
+function topToPdfY(cfg: PdfTemplateConfig, top: number): number {
+  return cfg.pageHeight - top;
 }
 
 /** Looks up the correct PDFPage for a page-indexed field/checkbox. */
 function getPage(pdfDoc: PDFDocument, pageIndex: number): PDFPage {
   return pdfDoc.getPage(pageIndex);
+}
+
+/**
+ * Standard PDF fonts only cover WinAnsi. Free text (client name, comments, office
+ * name) can contain characters outside it, which would make drawText throw and
+ * fail the whole PDF. Collapse whitespace/control characters and replace any
+ * character the font can't encode with "?".
+ */
+function toEncodable(font: PDFFont, text: string): string {
+  let out = "";
+  for (const ch of text.replace(/\s+/g, " ").normalize("NFC")) {
+    try {
+      font.encodeText(ch);
+      out += ch;
+    } catch {
+      out += "?";
+    }
+  }
+  return out.trim();
 }
 
 /**
@@ -152,15 +237,17 @@ function fitMultiLine(
 
 function drawSingleLineField(
   pdfDoc: PDFDocument,
+  cfg: PdfTemplateConfig,
   font: PDFFont,
   spec: PagedTextFieldSpec,
   value: string | number | null | undefined
 ) {
   if (value === null || value === undefined || value === "") return;
-  const text = String(value);
+  const clean = toEncodable(font, String(value));
+  if (!clean) return;
   const { size, text: fitted } = fitSingleLine(
     font,
-    text,
+    clean,
     spec.maxWidth,
     spec.maxFontSize,
     spec.minFontSize
@@ -168,14 +255,31 @@ function drawSingleLineField(
   const page = getPage(pdfDoc, spec.page);
   page.drawText(fitted, {
     x: spec.x,
-    // spec.top is the field's BASELINE (the underline's bottom edge), not a
-    // box top — deliberately NOT offset by `size` here. Font-fit shrinking
-    // changes `size` per value (e.g. a long region name vs. a short one),
-    // and subtracting a variable size from a fixed top would make the
-    // baseline drift upward as text shrinks, floating text above its
-    // underline instead of sitting on it. Anchoring directly to a fixed
-    // baseline keeps every value visually on its line regardless of size.
-    y: topToPdfY(spec.top),
+    // spec.top is the field's BASELINE (just above the underline), not a box
+    // top — deliberately NOT offset by `size`, so text stays on its line
+    // whether it renders at maxFontSize or has shrunk to fit.
+    y: topToPdfY(cfg, spec.top),
+    size,
+    font,
+    color: TEXT_COLOR,
+  });
+}
+
+/** Draws one line of text horizontally centered within [boxLeft, boxRight]. `top` is the top of the line. */
+function drawCenteredLine(
+  pdfDoc: PDFDocument,
+  cfg: PdfTemplateConfig,
+  font: PDFFont,
+  spec: OfficeNameSpec,
+  text: string,
+  size: number,
+  top: number
+) {
+  const textWidth = font.widthOfTextAtSize(text, size);
+  const x = (spec.boxLeft + spec.boxRight) / 2 - textWidth / 2;
+  getPage(pdfDoc, spec.page).drawText(text, {
+    x,
+    y: topToPdfY(cfg, top) - size,
     size,
     font,
     color: TEXT_COLOR,
@@ -183,56 +287,79 @@ function drawSingleLineField(
 }
 
 /**
- * Draws single-line text horizontally centered within [boxLeft, boxRight],
- * shrinking to fit maxWidth like drawSingleLineField. Used for the office
- * name placeholder above the title, where names vary in length.
+ * Office name under the printed header: centered, italic, smaller than the
+ * header. Fits on one line when it can (down to minSingleLineFontSize);
+ * otherwise wraps onto up to `maxLines` centered lines; only if that still
+ * overflows does it shrink further and ellipsize the last line.
  */
-function drawCenteredField(
+function drawOfficeName(
   pdfDoc: PDFDocument,
+  cfg: PdfTemplateConfig,
   font: PDFFont,
-  spec: {
-    page: number;
-    boxLeft: number;
-    boxRight: number;
-    top: number;
-    maxWidth: number;
-    maxFontSize: number;
-    minFontSize: number;
-  },
+  spec: OfficeNameSpec,
   value: string | null | undefined
 ) {
   if (!value) return;
-  const { size, text: fitted } = fitSingleLine(
-    font,
-    value,
-    spec.maxWidth,
-    spec.maxFontSize,
-    spec.minFontSize
-  );
-  const textWidth = font.widthOfTextAtSize(fitted, size);
-  const boxCenter = (spec.boxLeft + spec.boxRight) / 2;
-  const x = boxCenter - textWidth / 2;
-  const page = getPage(pdfDoc, spec.page);
-  page.drawText(fitted, {
-    x,
-    y: topToPdfY(spec.top) - size,
-    size,
-    font,
-    color: TEXT_COLOR,
+  const clean = toEncodable(font, value);
+  if (!clean) return;
+  const width = (t: string, size: number) => font.widthOfTextAtSize(t, size);
+
+  // 1. Single line.
+  let size = spec.maxFontSize;
+  while (size > spec.minSingleLineFontSize && width(clean, size) > spec.maxWidth) size -= 0.5;
+  if (width(clean, size) <= spec.maxWidth) {
+    drawCenteredLine(pdfDoc, cfg, font, spec, clean, size, spec.top);
+    return;
+  }
+
+  // 2. Wrap, shrinking only until it fits in maxLines.
+  size = spec.wrapFontSize;
+  let lines = wrapText(font, clean, spec.maxWidth, size);
+  while (lines.length > spec.maxLines && size > spec.minFontSize) {
+    size -= 0.5;
+    lines = wrapText(font, clean, spec.maxWidth, size);
+  }
+
+  // Balance a two-line wrap: narrow the wrap width as far as it still gives
+  // two lines, so the text splits evenly instead of leaving a lone last word.
+  if (lines.length === 2) {
+    let lo = Math.max(...clean.split(" ").map((w) => width(w, size)));
+    let hi = spec.maxWidth;
+    for (let i = 0; i < 12; i++) {
+      const mid = (lo + hi) / 2;
+      if (wrapText(font, clean, mid, size).length <= 2) hi = mid;
+      else lo = mid;
+    }
+    lines = wrapText(font, clean, hi, size);
+  }
+
+  // 3. Still too many lines (or a single word wider than the box): ellipsize.
+  if (lines.length > spec.maxLines) {
+    const kept = lines.slice(0, spec.maxLines);
+    // Fold the overflow into the last kept line so the ellipsis marks the cut.
+    kept[kept.length - 1] = lines.slice(spec.maxLines - 1).join(" ");
+    lines = kept;
+  }
+  lines.forEach((line, i) => {
+    const fit = fitSingleLine(font, line, spec.maxWidth, size, Math.min(size, spec.minFontSize));
+    drawCenteredLine(pdfDoc, cfg, font, spec, fit.text, fit.size, spec.wrappedTop + i * spec.lineHeight);
   });
 }
 
 function drawMultiLineField(
   pdfDoc: PDFDocument,
+  cfg: PdfTemplateConfig,
   font: PDFFont,
   spec: PagedTextFieldSpec,
   value: string | null | undefined
 ) {
   if (!value) return;
+  const clean = toEncodable(font, value);
+  if (!clean) return;
   const lineHeightRatio = spec.lineHeightRatio ?? LINE_HEIGHT_RATIO;
   const { size, lines } = fitMultiLine(
     font,
-    value,
+    clean,
     spec.maxWidth,
     spec.maxHeight ?? 9999,
     spec.maxFontSize,
@@ -240,7 +367,7 @@ function drawMultiLineField(
     lineHeightRatio
   );
   const page = getPage(pdfDoc, spec.page);
-  let y = topToPdfY(spec.top) - size;
+  let y = topToPdfY(cfg, spec.top) - size;
   for (const line of lines) {
     page.drawText(line, { x: spec.x, y, size, font, color: TEXT_COLOR });
     y -= size * lineHeightRatio;
@@ -251,6 +378,7 @@ function drawMultiLineField(
  * on the given page index. */
 function drawCheckmark(
   pdfDoc: PDFDocument,
+  cfg: PdfTemplateConfig,
   pageIndex: number,
   centerX: number,
   centerTop: number,
@@ -258,7 +386,7 @@ function drawCheckmark(
 ) {
   const page = getPage(pdfDoc, pageIndex);
   const cx = centerX;
-  const cy = topToPdfY(centerTop);
+  const cy = topToPdfY(cfg, centerTop);
   const half = sizePt / 2;
   // Short down-stroke then long up-stroke, classic checkmark proportions.
   const p1 = { x: cx - half, y: cy };
@@ -269,29 +397,27 @@ function drawCheckmark(
   page.drawLine({ start: p2, end: p3, thickness: 1.3, color: TEXT_COLOR });
 }
 
-function checkClientType(pdfDoc: PDFDocument, value: CsmResponseForPdf["client_type"]) {
-  const pt = CHECKBOXES_TAGALOG.clientType[value];
-  if (pt) drawCheckmark(pdfDoc, pt.page, pt.x, pt.y);
+function checkClientType(pdfDoc: PDFDocument, cfg: PdfTemplateConfig, value: CsmResponseForPdf["client_type"]) {
+  const pt = cfg.checkboxes.clientType[value];
+  if (pt) drawCheckmark(pdfDoc, cfg, pt.page, pt.x, pt.y);
 }
 
-function checkSex(pdfDoc: PDFDocument, value: CsmResponseForPdf["sex"]) {
+function checkSex(pdfDoc: PDFDocument, cfg: PdfTemplateConfig, value: CsmResponseForPdf["sex"]) {
   if (!value) return;
-  const pt = CHECKBOXES_TAGALOG.sex[value];
-  if (pt) drawCheckmark(pdfDoc, pt.page, pt.x, pt.y);
+  const pt = cfg.checkboxes.sex[value];
+  if (pt) drawCheckmark(pdfDoc, cfg, pt.page, pt.x, pt.y);
 }
 
-function checkCC(pdfDoc: PDFDocument, group: "cc1" | "cc2" | "cc3", code: number) {
-  const pt = (CHECKBOXES_TAGALOG[group] as Record<number, { x: number; y: number; page: number }>)[
-    code
-  ];
-  if (pt) drawCheckmark(pdfDoc, pt.page, pt.x, pt.y);
+function checkCC(pdfDoc: PDFDocument, cfg: PdfTemplateConfig, group: "cc1" | "cc2" | "cc3", code: number) {
+  const pt = cfg.checkboxes[group][code];
+  if (pt) drawCheckmark(pdfDoc, cfg, pt.page, pt.x, pt.y);
 }
 
-function checkSqd(pdfDoc: PDFDocument, rowKey: keyof typeof SQD_ROW_Y_TAGALOG, phrase: string) {
-  const colX = (SQD_COLUMN_X_TAGALOG as Record<string, number>)[phrase];
-  const row = SQD_ROW_Y_TAGALOG[rowKey];
+function checkSqd(pdfDoc: PDFDocument, cfg: PdfTemplateConfig, rowKey: SqdKey, phrase: string) {
+  const colX = cfg.sqdColumnX[phrase];
+  const row = cfg.sqdRowY[rowKey];
   if (colX === undefined || row === undefined) return;
-  drawCheckmark(pdfDoc, row.page, colX, row.y);
+  drawCheckmark(pdfDoc, cfg, row.page, colX, row.y);
 }
 
 function formatDate(iso: string): string {
@@ -300,104 +426,112 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString("en-PH", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
-async function loadTemplate(): Promise<PDFDocument> {
+async function loadTemplate(cfg: PdfTemplateConfig): Promise<PDFDocument> {
   const { data: templateBlob, error } = await supabase.storage
     .from(TEMPLATE_BUCKET)
-    .download(TEMPLATE_PATH);
+    .download(cfg.templatePath);
 
   if (error || !templateBlob) {
-    throw new Error(`Failed to load CSM PDF template: ${error?.message ?? "not found"}`);
+    throw new Error(
+      `Failed to load CSM PDF template (${cfg.templatePath}): ${error?.message ?? "not found"}`
+    );
   }
 
   const templateBytes = new Uint8Array(await templateBlob.arrayBuffer());
   return PDFDocument.load(templateBytes);
 }
 
+const SQD_KEYS = ["sqd0", "sqd1", "sqd2", "sqd3", "sqd4", "sqd5", "sqd6", "sqd7", "sqd8"] as const;
+
 /**
- * Fetches the CSM template from Supabase Storage and returns overlaid PDF bytes
- * for a single response row.
- *
- * TEMPORARY: always uses the Tagalog template (csm_onepage.pdf), regardless
- * of the response's actual language, until EN/TL selection is wired up.
- * `controlNo` is stamped by looping over `TEXT_FIELDS_TAGALOG.controlNo`
- * (an array of one spec now that the template is single-page) — kept as an
- * array/`.forEach()` rather than a single spec so this still works
- * unchanged if a future multi-page template reintroduces repeated
- * "Control No:" labels.
+ * Overlays one response onto an already-loaded template document. Split out
+ * from generateCsmPdf so it can be exercised without Supabase (scripts/tests).
  */
-export async function generateCsmPdf(response: CsmResponseForPdf): Promise<Uint8Array> {
-  const pdfDoc = await loadTemplate();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+export async function fillCsmPdf(
+  pdfDoc: PDFDocument,
+  response: CsmResponseForPdf,
+  lang: CsmPdfLang = "tl"
+): Promise<Uint8Array> {
+  const cfg = TEMPLATES[lang] ?? TEMPLATES.tl;
+  const fonts: Fonts = {
+    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+    italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+  };
+  const { regular: font } = fonts;
+  const tf = cfg.textFields;
 
   // --- Text fields ---
-  const controlNoSpecs = Array.isArray(TEXT_FIELDS_TAGALOG.controlNo)
-    ? TEXT_FIELDS_TAGALOG.controlNo
-    : [TEXT_FIELDS_TAGALOG.controlNo];
-  controlNoSpecs.forEach((spec) => drawSingleLineField(pdfDoc, font, spec, response.control_no));
+  const controlNoSpecs = Array.isArray(tf.controlNo) ? tf.controlNo : [tf.controlNo];
+  controlNoSpecs.forEach((spec) =>
+    drawSingleLineField(pdfDoc, cfg, font, spec, response.control_no)
+  );
 
-  drawCenteredField(pdfDoc, font, OFFICE_NAME_FIELD_TAGALOG, response.office_name);
-  drawSingleLineField(
-    pdfDoc,
-    font,
-    TEXT_FIELDS_TAGALOG.date as PagedTextFieldSpec,
-    formatDate(response.transaction_date)
-  );
-  drawSingleLineField(pdfDoc, font, TEXT_FIELDS_TAGALOG.age as PagedTextFieldSpec, response.age ?? "N/A");
-  drawSingleLineField(pdfDoc, font, TEXT_FIELDS_TAGALOG.region as PagedTextFieldSpec, response.region);
-  drawSingleLineField(pdfDoc, font, TEXT_FIELDS_TAGALOG.service as PagedTextFieldSpec, response.service);
-  drawSingleLineField(
-    pdfDoc,
-    font,
-    TEXT_FIELDS_TAGALOG.email as PagedTextFieldSpec,
-    response.email_address ?? ""
-  );
-  drawMultiLineField(
-    pdfDoc,
-    font,
-    TEXT_FIELDS_TAGALOG.comments as PagedTextFieldSpec,
-    response.comments ?? ""
-  );
+  // Office name: smaller italic text under the printed "CITY GOVERNMENT OF SAN PABLO" (wraps to 2 lines if long).
+  drawOfficeName(pdfDoc, cfg, fonts.italic, cfg.officeName, response.office_name);
+
+  drawSingleLineField(pdfDoc, cfg, font, tf.date as PagedTextFieldSpec, formatDate(response.transaction_date));
+  drawSingleLineField(pdfDoc, cfg, font, tf.age as PagedTextFieldSpec, response.age ?? "N/A");
+  drawSingleLineField(pdfDoc, cfg, font, tf.region as PagedTextFieldSpec, response.region);
+  drawSingleLineField(pdfDoc, cfg, font, tf.service as PagedTextFieldSpec, response.service);
+  drawMultiLineField(pdfDoc, cfg, font, tf.comments as PagedTextFieldSpec, response.comments ?? "");
+  drawSingleLineField(pdfDoc, cfg, font, tf.clientName as PagedTextFieldSpec, response.client_name);
+  drawSingleLineField(pdfDoc, cfg, font, tf.contactNo as PagedTextFieldSpec, response.contact_no);
+  drawSingleLineField(pdfDoc, cfg, font, tf.email as PagedTextFieldSpec, response.email_address);
 
   // --- Checkboxes ---
-  checkClientType(pdfDoc, response.client_type);
-  checkSex(pdfDoc, response.sex ?? undefined);
-  checkCC(pdfDoc, "cc1", response.cc1);
-  checkCC(pdfDoc, "cc2", response.cc2);
-  checkCC(pdfDoc, "cc3", response.cc3);
-
-  (["sqd0", "sqd1", "sqd2", "sqd3", "sqd4", "sqd5", "sqd6", "sqd7", "sqd8"] as const).forEach(
-    (key) => checkSqd(pdfDoc, key, response[key])
-  );
+  checkClientType(pdfDoc, cfg, response.client_type);
+  checkSex(pdfDoc, cfg, response.sex ?? undefined);
+  checkCC(pdfDoc, cfg, "cc1", response.cc1);
+  checkCC(pdfDoc, cfg, "cc2", response.cc2);
+  checkCC(pdfDoc, cfg, "cc3", response.cc3);
+  SQD_KEYS.forEach((key) => checkSqd(pdfDoc, cfg, key, response[key]));
 
   return pdfDoc.save();
 }
 
 /**
- * Calibration helper — NOT used in production. Loads the Tagalog template and
- * stamps a checkmark on every single checkbox coordinate in the map
- * simultaneously (client type x3, sex x2, cc1 x4, cc2 x5, cc3 x4, sqd0-8 x6 =
- * 54 marks, all on the single page now), ignoring the fact that a real
- * submission only ever selects one option per group. Use this while
- * trial-and-error tuning the `_TAGALOG` exports in csmPdfCoordinates.ts so
- * you can see every checkbox's position — and the still-unverified
- * office-name placement — in a single render instead of one at a time.
+ * Fetches the CSM template for `lang` from Supabase Storage and returns the
+ * overlaid PDF bytes for a single response row.
+ *
+ * `lang` is the language the respondent chose on the form. It is used only to
+ * pick the template; it is not stored. English currently falls back to the
+ * Tagalog template (see TEMPLATES).
  */
-export async function generateCalibrationPdf(): Promise<Uint8Array> {
-  const pdfDoc = await loadTemplate();
-  const calibrationFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+export async function generateCsmPdf(
+  response: CsmResponseForPdf,
+  lang: CsmPdfLang = "tl"
+): Promise<Uint8Array> {
+  const cfg = TEMPLATES[lang] ?? TEMPLATES.tl;
+  const pdfDoc = await loadTemplate(cfg);
+  return fillCsmPdf(pdfDoc, response, lang);
+}
 
-  drawCenteredField(pdfDoc, calibrationFont, OFFICE_NAME_FIELD_TAGALOG, "City Treasurer's Office");
+/**
+ * Calibration helper — NOT used in production. Loads the template for `lang`
+ * and stamps a checkmark on every checkbox coordinate simultaneously, plus
+ * sample text in every field, so every position can be checked in one render.
+ */
+export async function generateCalibrationPdf(lang: CsmPdfLang = "tl"): Promise<Uint8Array> {
+  const cfg = TEMPLATES[lang] ?? TEMPLATES.tl;
+  const pdfDoc = await loadTemplate(cfg);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const italic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+  const tf = cfg.textFields;
 
-  Object.values(CHECKBOXES_TAGALOG.clientType).forEach((pt) =>
-    drawCheckmark(pdfDoc, pt.page, pt.x, pt.y)
-  );
-  Object.values(CHECKBOXES_TAGALOG.sex).forEach((pt) => drawCheckmark(pdfDoc, pt.page, pt.x, pt.y));
-  Object.values(CHECKBOXES_TAGALOG.cc1).forEach((pt) => drawCheckmark(pdfDoc, pt.page, pt.x, pt.y));
-  Object.values(CHECKBOXES_TAGALOG.cc2).forEach((pt) => drawCheckmark(pdfDoc, pt.page, pt.x, pt.y));
-  Object.values(CHECKBOXES_TAGALOG.cc3).forEach((pt) => drawCheckmark(pdfDoc, pt.page, pt.x, pt.y));
+  drawOfficeName(pdfDoc, cfg, italic, cfg.officeName, "City Treasurer's Office");
+  drawSingleLineField(pdfDoc, cfg, font, tf.clientName as PagedTextFieldSpec, "Juan Dela Cruz");
+  drawSingleLineField(pdfDoc, cfg, font, tf.contactNo as PagedTextFieldSpec, "0917 123 4567");
+  drawSingleLineField(pdfDoc, cfg, font, tf.email as PagedTextFieldSpec, "juan@email.com");
 
-  (Object.keys(SQD_ROW_Y_TAGALOG) as (keyof typeof SQD_ROW_Y_TAGALOG)[]).forEach((rowKey) => {
-    Object.keys(SQD_COLUMN_X_TAGALOG).forEach((phrase) => checkSqd(pdfDoc, rowKey, phrase));
+  const mark = (pt: PagedPoint) => drawCheckmark(pdfDoc, cfg, pt.page, pt.x, pt.y);
+  Object.values(cfg.checkboxes.clientType).forEach(mark);
+  Object.values(cfg.checkboxes.sex).forEach(mark);
+  Object.values(cfg.checkboxes.cc1).forEach(mark);
+  Object.values(cfg.checkboxes.cc2).forEach(mark);
+  Object.values(cfg.checkboxes.cc3).forEach(mark);
+
+  (Object.keys(cfg.sqdRowY) as SqdKey[]).forEach((rowKey) => {
+    Object.keys(cfg.sqdColumnX).forEach((phrase) => checkSqd(pdfDoc, cfg, rowKey, phrase));
   });
 
   return pdfDoc.save();

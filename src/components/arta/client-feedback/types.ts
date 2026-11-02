@@ -35,6 +35,8 @@ export interface FormState {
   age: string;
   region: string; // region NAME is what's stored, per spec
   service: string;
+  clientName: string;
+contactNo: string;
 
   cc1: number | null;
   cc2: number | null;

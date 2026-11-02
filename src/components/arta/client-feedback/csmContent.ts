@@ -24,6 +24,8 @@ export const initialState: FormState = {
   sqd8: null,
   comments: "",
   emailAddress: "",
+  clientName: "",
+  contactNo: "",
 };
 
 export const PSGC_BASE = "/api/psgc";
@@ -80,6 +82,12 @@ export const CONTENT: Record<
     commentsNotice: string;
     emailLabel: string;
     emailPlaceholder: string;
+    clientNameLabel: string;
+    clientNamePlaceholder: string;
+    contactNoLabel: string;
+    contactNoPlaceholder: string;
+    contactDetailsNotice: string;
+    errContactNo: string;
     backBtn: string;
     nextBtn: string;
     submitBtn: string;
@@ -155,6 +163,12 @@ export const CONTENT: Record<
 
     emailLabel: "Email address",
     emailPlaceholder: "juan@email.com",
+    clientNameLabel: "Name of client",
+    clientNamePlaceholder: "e.g. Juan Dela Cruz",
+    contactNoLabel: "Contact no.",
+    contactNoPlaceholder: "e.g. 0917 123 4567",
+    contactDetailsNotice: "Optional. Your name and contact details are used only for follow-up on your feedback.",
+    errContactNo: "Please enter a valid contact number (7 to 12 digits).",
     backBtn: "Back",
     nextBtn: "Next",
     submitBtn: "Submit and Download Form",
@@ -236,6 +250,12 @@ export const CONTENT: Record<
     commentsNotice: "Huwag po maglagay ng pangalan o contact details (email, numero ng telepono) sa inyong komento.",
     emailLabel: "Email address",
     emailPlaceholder: "juan@email.com",
+    clientNameLabel: "Pangalan ng kliyente",
+    clientNamePlaceholder: "hal. Juan Dela Cruz",
+    contactNoLabel: "Contact no.",
+    contactNoPlaceholder: "hal. 0917 123 4567",
+    contactDetailsNotice: "Opsyonal. Ang inyong pangalan at contact details ay gagamitin lamang para sa follow-up ng inyong puna.",
+    errContactNo: "Maglagay ng wastong contact number (7 hanggang 12 digit).",
     backBtn: "Bumalik",
     nextBtn: "Susunod",
     submitBtn: "Ipasa at I-download ang Form",

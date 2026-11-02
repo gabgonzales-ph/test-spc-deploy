@@ -1,9 +1,13 @@
+//src/backend/routes/csm.ts
+
 import { Elysia } from 'elysia'
-import { supabase } from '@/backend/config/database'
+import { supabaseAdmin } from '@/backend/config/database'
 import { errorHandler, throwValidationError } from '@/backend/utils/error'
+import { cleanOptional } from '@/lib/csm/csmContact'
 import { CsmResponseSchema } from '@/backend/schemas/csm'
 import {
   generateCsmPdf,
+  resolvePdfLang,
   type CsmResponseForPdf,
 } from '@/backend/utils/csm/csmPdfService'
 import { redactContactDetails } from '@/backend/utils/csm/csmRedact'
@@ -33,12 +37,20 @@ export const csmRoutes = new Elysia({ prefix: '/csm-response' })
 
     const input = parsed.data
 
+    // Language the respondent chose on the form. Used only to pick the PDF
+    // template at submit time; it is not stored. Unknown/missing -> Tagalog.
+    const pdfLang = resolvePdfLang(input.language)
+
     // Mask emails and phone numbers; slice after redaction because placeholders can add a character.
     const comments =
       redactContactDetails(input.comments)?.trim().slice(0, 1000) || null
 
+    // Trim and turn blanks into null; the same values go to the DB and the PDF.
+    const clientName = cleanOptional(input.clientName)
+    const contactNo = cleanOptional(input.contactNo)
+
     // Insert + control_no assignment happens atomically in a single Postgres function.
-    const { data: inserted, error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabaseAdmin
       .rpc('insert_csm_response', {
         p_office_id: input.officeId,
         p_client_type: input.clientType,
@@ -61,6 +73,8 @@ export const csmRoutes = new Elysia({ prefix: '/csm-response' })
         p_sqd8: input.sqd8,
         p_comments: comments,
         p_email_address: input.emailAddress || null,
+        p_client_name: clientName,
+        p_contact_no: contactNo,
       })
       .single()
 
@@ -105,11 +119,13 @@ export const csmRoutes = new Elysia({ prefix: '/csm-response' })
       sqd8: input.sqd8,
       comments: comments,
       email_address: input.emailAddress || null,
+      client_name: clientName,
+      contact_no: contactNo,
       office_name: row.office_name ?? null,
     }
 
     try {
-      const pdfBytes = await generateCsmPdf(pdfRow)
+      const pdfBytes = await generateCsmPdf(pdfRow, pdfLang)
       const pdfBuffer = Buffer.from(pdfBytes)
 
       set.headers['Content-Type'] = 'application/pdf'

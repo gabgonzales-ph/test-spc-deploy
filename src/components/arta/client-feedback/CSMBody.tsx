@@ -3,6 +3,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Send } from "lucide-re
 import { choiceBtnClass, fadeInUp, inputClass, orderSqdOptions, SQD_ICONS } from "./csmContent";
 import { RadioGroup } from "./RadioGroup";
 import type { ClientType, Sex } from "./types";
+import { sanitizeContactNo } from "@/lib/csm/csmContact";
 import type { UseCSMFormReturn } from "@/hooks/useCSMForm";
 
 
@@ -252,6 +253,36 @@ export function CSMBody({ csm }: Props) {
               />
             <p className="text-[12px] text-gray-400">{t.commentsNotice}</p>
   <p className="text-[12px] text-gray-400 shrink-0">Comment length: {form.comments.length}/1000</p>
+</div>
+<div ref={registerField("clientName")}>
+  <label className="block text-[13px] font-medium text-gray-700 mb-1.5">
+    {t.clientNameLabel} <span className="text-gray-400 font-normal">{t.optionalTag}</span>
+  </label>
+  <input
+    type="text"
+    value={form.clientName}
+    onChange={(e) => setField("clientName", e.target.value.slice(0, 200))}
+    placeholder={t.clientNamePlaceholder}
+    className={inputClass}
+  />
+</div>
+
+<div ref={registerField("contactNo")}>
+  <label className="block text-[13px] font-medium text-gray-700 mb-1.5">
+    {t.contactNoLabel} <span className="text-gray-400 font-normal">{t.optionalTag}</span>
+  </label>
+  <input
+    type="tel"
+    inputMode="tel"
+    value={form.contactNo}
+    onChange={(e) => setField("contactNo", sanitizeContactNo(e.target.value))}
+    placeholder={t.contactNoPlaceholder}
+    className={inputClass}
+  />
+  {fieldError?.field === "contactNo" && (
+    <p className="mt-1.5 text-[12px] text-red-600">{fieldError.message}</p>
+  )}
+  <p className="mt-1.5 text-[12px] text-gray-400">{t.contactDetailsNotice}</p>
 </div>
 
             <div ref={registerField("emailAddress")}>

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { cleanOptional, isValidContactNo, isValidEmail } from "@/lib/csm/csmContact";
+
 import { useRouter } from "next/navigation";
 import {
   CC2_NA_VALUE,
@@ -176,11 +178,14 @@ export function useCSMForm({ officeSlug }: CSMFormProps) {
       if (missingKey) return { field: missingKey, message: t.errSqd };
       return null;
     }
-    if (step === 3) {
-      if (form.emailAddress && !/^\S+@\S+\.\S+$/.test(form.emailAddress))
-        return { field: "emailAddress", message: t.errEmail };
-      return null;
-    }
+// step 3
+if (step === 3) {
+  if (form.contactNo.trim() && !isValidContactNo(form.contactNo.trim()))
+    return { field: "contactNo", message: t.errContactNo };
+  if (form.emailAddress.trim() && !isValidEmail(form.emailAddress.trim()))
+    return { field: "emailAddress", message: t.errEmail };
+  return null;
+}
     return null;
   }, [step, form, cc1IsNotAware, t]);
 
@@ -247,6 +252,7 @@ export function useCSMForm({ officeSlug }: CSMFormProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          language: lang,
           officeId: office.id,
           clientType: form.clientType,
           transactionDate: form.transactionDate,
@@ -270,6 +276,8 @@ export function useCSMForm({ officeSlug }: CSMFormProps) {
           sqd8: form.sqd8,
           comments: form.comments.trim() || undefined,
           emailAddress: form.emailAddress.trim() || undefined,
+          clientName: cleanOptional(form.clientName) ?? undefined,
+contactNo: cleanOptional(form.contactNo) ?? undefined,
         }),
       });
 
