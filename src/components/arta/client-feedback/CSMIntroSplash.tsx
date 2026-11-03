@@ -68,23 +68,25 @@ export function CSMIntroSplash({
   onChooseLanguage: (lang: Lang) => void;
   onReturn: () => void;
 }) {
+  // Hiding the site chrome is handled by CSMForm for the whole CSM page.
   return (
     <AnimatePresence>
       {show && (
         <motion.section
           key="csm-splash-overlay"
-          initial={{ opacity: 0, y: 40 }}
+          // Starts fully opaque so the site is never visible behind the splash on first paint.
+          initial={{ opacity: 1, y: 0 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -40 }}
           transition={{ duration: 0.6, ease: "easeInOut" }}
-          className="fixed inset-0 z-[9999] overflow-hidden bg-gradient-to-b from-white via-emerald-50/40 to-white flex flex-col items-center justify-center px-4"
+          className="fixed inset-0 z-[9999] overflow-hidden bg-gradient-to-br from-white via-emerald-50 to-emerald-100 flex flex-col items-center justify-center px-4"
         >
           {/* Decorative background accents */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl" />
             <div className="absolute -bottom-32 -right-16 h-96 w-96 rounded-full bg-emerald-300/30 blur-3xl" />
             <div className="absolute top-1/3 right-10 h-40 w-40 rounded-full bg-teal-100/50 blur-2xl hidden sm:block" />
-            <svg className="absolute inset-0 h-full w-full opacity-[0.05]" aria-hidden="true">
+            <svg className="absolute inset-0 h-full w-full opacity-[0.14]" aria-hidden="true">
               <defs>
                 <pattern id="csm-dot-grid" width="28" height="28" patternUnits="userSpaceOnUse">
                   <circle cx="1.5" cy="1.5" r="1.5" fill="#047857" />

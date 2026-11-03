@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, Languages } from "lucide-react";
 import { motion } from "framer-motion";
@@ -11,10 +12,21 @@ import { CSMSuccessOverlay } from "./CSMSuccessOverlay";
 import { useCSMForm } from "@/hooks/useCSMForm";
 import type { CSMFormProps } from "./types";
 
+// Set on <html> for as long as this page is mounted. global.css uses it to
+// hide the site chrome (header, footer, chat widget, privacy popup) during
+// both the intro splash and the form itself, on every screen size.
+const CHROME_HIDDEN_ATTR = "data-csm-intro";
+
 export default function CSMForm({ officeSlug }: CSMFormProps) {
   const router = useRouter();
   const csm = useCSMForm({ officeSlug });
   const { showIntro, lang, setLang, chooseLanguage, office, loadingOffice, officeError, officeNotFound, t, formTopRef, step, status, pdfDownloadFailed, showSuccessOverlay } = csm;
+
+  useEffect(() => {
+    document.documentElement.setAttribute(CHROME_HIDDEN_ATTR, "true");
+    // Restore the site chrome when leaving the CSM page.
+    return () => document.documentElement.removeAttribute(CHROME_HIDDEN_ATTR);
+  }, []);
 
   return (
     <>
@@ -33,17 +45,18 @@ export default function CSMForm({ officeSlug }: CSMFormProps) {
       {!showIntro && (
         <motion.div
           ref={formTopRef}
-          className="w-full max-w-2xl mx-auto mt-12 scroll-mt-6"
+          className="w-full sm:max-w-2xl mx-auto sm:mt-12 scroll-mt-6"
           initial="hidden"
           animate="visible"
           variants={staggerContainer}
         >
-          <div className="bg-white rounded-2xl overflow-hidden drop-shadow-lg shadow-gray-900/5 border border-gray-200">
+          {/* Below sm: full-screen, no card chrome. From sm up: the original card. */}
+          <div className="min-h-screen sm:min-h-0 bg-white sm:rounded-2xl overflow-hidden sm:drop-shadow-lg sm:shadow-gray-900/5 sm:border border-gray-200">
             {/* Header */}
             <motion.div
               variants={fadeInUp}
               transition={{ duration: 0.4, ease: "easeOut" }}
-              className="px-6 sm:px-8 py-6 bg-gray-50/60"
+              className="px-4 sm:px-8 py-5 sm:py-6 bg-gray-50/60"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>

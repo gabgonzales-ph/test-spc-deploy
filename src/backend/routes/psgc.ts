@@ -1,3 +1,5 @@
+//backend/routes/psgc.ts -- website
+
 import { Elysia, t } from "elysia";
 
 // Proxies requests to PSGC Cloud v2 (https://psgc.cloud/api/v2) so the

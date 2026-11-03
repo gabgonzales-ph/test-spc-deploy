@@ -1,3 +1,5 @@
+//src/app/arta/client-feedback/[officeSlug]/page.tsx
+
 import type { Metadata } from "next";
 import CSMForm from "@/components/arta/client-feedback/CSMForm";
 
@@ -15,10 +17,8 @@ export default async function ClientFeedbackOfficePage({
   const { officeSlug } = await params;
 
   return (
-    <main className="min-h-screen bg-gray-50/60 px-4 py-8 sm:py-12">
-      <h1 className="mx-auto mb-4 w-full max-w-2xl text-[15px] font-semibold tracking-wide text-gray-500 sm:text-[16px]">
-        CLIENT FEEDBACK
-      </h1>
+    // Below sm the form is full-screen: no page padding and a white background.
+    <main className="min-h-screen bg-white sm:bg-gray-50/60 sm:px-4 sm:py-12">
       <CSMForm officeSlug={officeSlug} />
     </main>
   );

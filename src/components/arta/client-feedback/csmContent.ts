@@ -159,7 +159,7 @@ export const CONTENT: Record<
     sqdOptions: ["Strongly Disagree", "Disagree", "Neither Agree nor Disagree", "Agree", "Strongly Agree", "Not Applicable"],
     commentsLabel: "Suggestions on how we can further improve our services",
     commentsPlaceholder: "Tell us how we can do better...",
-    commentsNotice: "Please do not include names or contact details (email, phone number) in your comment.",
+    commentsNotice: "Please do not include sensitive information in your comment.",
 
     emailLabel: "Email address",
     emailPlaceholder: "juan@email.com",

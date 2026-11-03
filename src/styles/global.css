@@ -184,3 +184,13 @@
   70% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(1.15); }
 }
+/* CSM intro splash: while it is open, CSMIntroSplash sets data-csm-intro="true"
+   on <html>. This hides the header, footer, chat widget and privacy popup
+   (display: none also removes them from screen readers and Tab focus).
+   The attribute is removed after the splash exit animation finishes. */
+html[data-csm-intro="true"] [data-site-chrome],
+/* Catch-all for anything rendered straight into <body> (e.g. portals used by
+   the chat widget or popups): hide everything except <main> and Next.js internals. */
+html[data-csm-intro="true"] body > *:not(main):not(script):not(style):not(next-route-announcer) {
+  display: none !important;
+}

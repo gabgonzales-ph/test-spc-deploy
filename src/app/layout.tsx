@@ -54,15 +54,26 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <DataPrivacyPolicyPopup />
-          <Header />
-          <FloatingWidgets />
+          {/*
+            data-site-chrome + `contents` keeps layout unchanged while giving CSS
+            a hook: html[data-csm-intro="true"] [data-site-chrome] is hidden
+            while the CSM intro splash is open (see global.css).
+          */}
+          <div data-site-chrome className="contents">
+            <DataPrivacyPolicyPopup />
+          </div>
+          <div data-site-chrome className="contents">
+            <Header />
+          </div>
+          <div data-site-chrome className="contents">
+            <FloatingWidgets />
+          </div>
           <main className="flex-1">{children}</main>
-          <Footer />
+          <div data-site-chrome className="contents">
+            <Footer />
+          </div>
         </ThemeProvider>
         <DisableRightClick />
-
-      
       </body>
     </html>
   );

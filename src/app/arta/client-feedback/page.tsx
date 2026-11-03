@@ -1,3 +1,5 @@
+//src/app/arta/client-feedback/[officeSlug]/page.tsx
+
 import type { Metadata } from "next";
 import CSMForm from "@/components/arta/client-feedback/CSMForm";
 
@@ -10,9 +12,7 @@ export const metadata: Metadata = {
 export default function ClientFeedbackPage() {
   return (
     <main className="min-h-screen bg-gray-50/60 px-4 py-8 sm:py-12">
-      <h1 className="mx-auto mb-4 w-full max-w-2xl text-[15px] font-semibold tracking-wide text-gray-500 sm:text-[16px]">
-        CLIENT FEEDBACK
-      </h1>
+
       <CSMForm />
     </main>
   );
