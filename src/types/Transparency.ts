@@ -11,7 +11,6 @@ export interface DisclosureDocument {
   title:         string
   date_passed:   string | null
   year:          number | null
-  document_path: string | null
   pdf_url:       string | null
   status:        'active' | 'repealed'
   created_at:    string

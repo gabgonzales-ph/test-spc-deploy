@@ -4,21 +4,21 @@ import { Elysia } from 'elysia'
 import { supabase } from '@/backend/config/database'
 import { errorHandler } from '@/backend/utils/error'
 import { formatPaginationResponse } from '@/backend/utils/helpers'
+import { downloadUrl } from '@/lib/download/fileToken'
 
 function getProxyUrl(filePath: string): string | null {
   if (!filePath) return null
-  return `/api/download/documents/${filePath}`
+  return downloadUrl(filePath)
 }
 
 function enrichDocument(doc: Record<string, unknown>) {
+  const { file_url, ...rest } = doc
   return {
-    ...doc,
-    year: doc.date_issued
-      ? new Date(doc.date_issued as string).getFullYear()
+    ...rest,
+    year: rest.date_issued
+      ? new Date(rest.date_issued as string).getFullYear()
       : null,
-    pdf_url: doc.file_url
-      ? getProxyUrl(doc.file_url as string)
-      : null,
+    pdf_url: file_url ? getProxyUrl(file_url as string) : null,
   }
 }
 

@@ -2,23 +2,21 @@ import { Elysia } from 'elysia'
 import { supabase } from '@/backend/config/database'
 import { errorHandler } from '@/backend/utils/error'
 import { formatPaginationResponse } from '@/backend/utils/helpers'
+import { downloadUrl } from '@/lib/download/fileToken'
 
 function getProxyUrl(filePath: string): string | null {
   if (!filePath) return null
-  // Proxy route: /api/download/[bucket]/[...filePath]
-  // bucket = "transparency", filePath already includes "full-transparency/filename.pdf"
-  return `/api/download/documents/${filePath}`
+  return downloadUrl(filePath)
 }
 
 function enrichDocument(doc: Record<string, unknown>) {
+  const { document_path, ...rest } = doc
   return {
-    ...doc,
-    year: doc.date_passed
-      ? new Date(doc.date_passed as string).getFullYear()
+    ...rest,
+    year: rest.date_passed
+      ? new Date(rest.date_passed as string).getFullYear()
       : null,
-    pdf_url: doc.document_path
-      ? getProxyUrl(doc.document_path as string)
-      : null,
+    pdf_url: document_path ? getProxyUrl(document_path as string) : null,
   }
 }
 

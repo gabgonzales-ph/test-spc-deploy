@@ -1,5 +1,8 @@
+// src/app/api/publications/vacancies/route.ts
+
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { downloadUrl } from "@/lib/download/fileToken";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,7 +17,15 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(500);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("Failed to load vacancies:", error.message);
+    return NextResponse.json({ error: "Failed to load vacancies" }, { status: 500 });
+  }
 
-  return NextResponse.json(data ?? []);
+  const items = (data ?? []).map(({ file_path, ...rest }) => ({
+    ...rest,
+    pdf_url: file_path ? downloadUrl(file_path) : null,
+  }));
+
+  return NextResponse.json(items);
 }

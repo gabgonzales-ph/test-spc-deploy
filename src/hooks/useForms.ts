@@ -16,7 +16,6 @@ export interface FormDocument {
   title:         string
   date_issued:   string | null
   year:          number | null
-  file_url:      string | null // Updated from file_path/document_path
   pdf_url:       string | null
   status:        'active' | 'archived'
   created_at:    string

@@ -93,21 +93,21 @@ export default function JobVacancies() {
     try {
       const res = await fetch("/api/publications/vacancies");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: {
-        publication_id: number;
-        filename: string;
-        file_path: string;
-        created_at: string;
-      }[] = await res.json();
+const data: {
+  publication_id: number;
+  filename: string;
+  pdf_url: string | null;
+  created_at: string;
+}[] = await res.json();
 
-      setVacancies(
-        data.map((pub) => ({
-          id:         pub.publication_id,
-          datePosted: pub.created_at,
-          filename:   pub.filename,
-          pdfUrl:     `/api/download/documents/${pub.file_path}`,
-        }))
-      );
+setVacancies(
+  data.map((pub) => ({
+    id:         pub.publication_id,
+    datePosted: pub.created_at,
+    filename:   pub.filename,
+    pdfUrl:     pub.pdf_url,
+  }))
+);
     } catch (err) {
       console.error("Failed to fetch publications:", err);
       setError("Unable to load vacancies at this time. Please try again later.");
