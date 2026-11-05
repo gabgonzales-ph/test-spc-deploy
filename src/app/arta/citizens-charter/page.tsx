@@ -58,7 +58,7 @@ export default function CitizensCharterPage() {
               </div>
 
 <Image
-  src="/citizens-charter/logo/vm-justin.webp"
+  src="/citizens-charter/logo/am-carmela.png"
   alt="City Seal"
   width={160}
   height={160}

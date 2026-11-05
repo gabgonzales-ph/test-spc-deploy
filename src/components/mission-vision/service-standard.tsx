@@ -104,9 +104,9 @@ export default function ServiceStandardStack({
   const nextImage = standards[(index + 1) % total].image_url ?? FALLBACK_IMAGE;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-0 md:gap-0 items-center">
+    <div className="grid grid-cols-1 md:grid-cols-1 gap-0 md:gap-0 items-center">
       {/* Image column - fixed aspect-ratio box so swapping images never shifts layout */}
-      <div className="flex justify-center">
+      {/* <div className="flex justify-center">
         <div className="relative w-full max-w-[480px] sm:max-w-[650px] aspect-[11/13]">
           <Image
             key={activeImage}
@@ -118,8 +118,6 @@ export default function ServiceStandardStack({
             priority
           />
 
-          {/* Preload previous/next images so they're already cached when they
-              become active — invisible but still fetched (loading="eager"). */}
           <Image
             key={`preload-prev-${prevImage}`}
             src={prevImage}
@@ -139,7 +137,7 @@ export default function ServiceStandardStack({
             className="object-contain opacity-0 pointer-events-none"
           />
         </div>
-      </div>
+      </div> */}
 
       {/* Cards column */}
       <div className="relative mx-auto w-full max-w-2xl overflow-hidden px-4 sm:px-6">
