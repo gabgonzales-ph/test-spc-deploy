@@ -4,6 +4,14 @@ import { usePathname } from "next/navigation";
 
 const EXCLUDED_ROUTES = ["/privacy-policy", "/terms-of-service", "/cookie-policy"];
 
+// Routes where the popup must never mount or lock the page. The CSM form hides
+// the site chrome with CSS, so a mounted popup would hold an invisible scroll lock.
+const EXCLUDED_PREFIXES = ["/arta/client-feedback"];
+
+const isExcluded = (p: string | null) =>
+  !!p &&
+  (EXCLUDED_ROUTES.includes(p) || EXCLUDED_PREFIXES.some((x) => p.startsWith(x)));
+
 export default function DataPrivacyPolicyPopup() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState<boolean | null>(null);
@@ -12,7 +20,7 @@ export default function DataPrivacyPolicyPopup() {
   // Check localStorage immediately after mount — no artificial delay.
   // isOpen stays null on first paint so popup text never becomes the LCP element.
   useEffect(() => {
-    if (EXCLUDED_ROUTES.includes(pathname)) {
+    if (isExcluded(pathname)) {
       setIsOpen(false);
       setIsRejected(false);
       return;
@@ -25,7 +33,7 @@ export default function DataPrivacyPolicyPopup() {
 
   // Body scroll lock
   useEffect(() => {
-    if (EXCLUDED_ROUTES.includes(pathname)) return;
+    if (isExcluded(pathname)) return;
     if (!isOpen && !isRejected) return;
 
     const scrollY = window.scrollY;
@@ -45,7 +53,7 @@ export default function DataPrivacyPolicyPopup() {
 
   // Restore body styles on excluded routes
   useEffect(() => {
-    if (EXCLUDED_ROUTES.includes(pathname)) {
+    if (isExcluded(pathname)) {
       document.body.style.position = "";
       document.body.style.top = "";
       document.body.style.width = "";
@@ -54,7 +62,7 @@ export default function DataPrivacyPolicyPopup() {
   }, [pathname]);
 
   if (isOpen === null) return null;
-  if (EXCLUDED_ROUTES.includes(pathname)) return null;
+  if (isExcluded(pathname)) return null;
 
   if (isRejected) {
     return (
@@ -76,8 +84,9 @@ export default function DataPrivacyPolicyPopup() {
                 The City Government of San Pablo values your privacy and is dedicated to
                 protecting your personal data in compliance with the Data Privacy Act (DPA)
                 of 2012 (Republic Act No. 10173).{" "}
-                
-                <a  href="/privacy-policy"
+
+                <a
+                  href="/privacy-policy"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:text-blue-700 font-medium underline"
